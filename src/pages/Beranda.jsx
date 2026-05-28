@@ -4,7 +4,7 @@ import { placesData } from "../data/place";
 
 export default function Beranda() {
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-gray-50 pb-12 select-none">
       <nav className="bg-white px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
         <img
           src={textLogo}
