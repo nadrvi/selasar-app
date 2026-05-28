@@ -2,18 +2,18 @@ export const placesData = [
   {
     id: 1,
     name: "Kopi Nalar",
-    image: "https://via.placeholder.com/300", // Nanti ganti sama gambar asli
+    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=600&q=80",
     noiseLevel: "Tenang",
     wifiStatus: "Bagus",
     colokanProbability: "80%",
-    visitors: 15,
+    visitors: 12,
     mood: "Fokus",
     overthinkingStatus: "Aman buat fokus",
   },
   {
     id: 2,
     name: "Titik Koma Coffee",
-    image: "https://via.placeholder.com/300",
+    image: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=600&q=80",
     noiseLevel: "Lumayan ramai",
     wifiStatus: "Sedang",
     colokanProbability: "40%",
@@ -24,12 +24,23 @@ export const placesData = [
   {
     id: 3,
     name: "Ruang Seduh",
-    image: "https://via.placeholder.com/300",
-    noiseLevel: "Tenang",
+    image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=600&q=80",
+    noiseLevel: "Sunyi",
     wifiStatus: "Sangat Bagus",
     colokanProbability: "95%",
-    visitors: 8,
+    visitors: 5,
     mood: "Deadline mode",
     overthinkingStatus: "Aman buat fokus",
+  },
+  {
+    id: 4,
+    name: "Bilik Kopi",
+    image: "https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?auto=format&fit=crop&w=600&q=80",
+    noiseLevel: "Ramai",
+    wifiStatus: "Bagus",
+    colokanProbability: "20%",
+    visitors: 45,
+    mood: "Healing",
+    overthinkingStatus: "Banyak distraksi",
   }
 ];

@@ -38,7 +38,7 @@ export default function Login() {
             {/* Tombol Login */}
             <button
               type="submit"
-              className="w-full mt-4 bg-gray-400 hover:bg-green-700 text-white font-semibold py-3 rounded-full transition-all shadow-md"
+              className="cursor-pointer w-full mt-4 bg-gray-400 hover:bg-green-700 text-white font-semibold py-3 rounded-full transition-all shadow-md"
             >
               Login
             </button>

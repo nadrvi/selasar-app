@@ -65,7 +65,7 @@ export default function Register() {
             {/* Tombol Register */}
             <button
               type="button"
-              className="w-full mt-2 bg-gray-400 hover:bg-green-700 text-white font-semibold py-3 rounded-full transition-all shadow-md"
+              className="w-full mt-2 bg-gray-400 hover:bg-green-700 text-white font-semibold py-3 rounded-full transition-all shadow-md cursor-pointer"
             >
               Daftar
             </button>
