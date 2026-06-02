@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="id" class="scroll-smooth">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Selasar — Cari Tempat Nugas Nyaman</title>
+  <meta name="description" content="Selasar membantu mahasiswa menemukan tempat nugas yang nyaman berdasarkan mood, wifi, colokan, suasana, dan keramaian." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+      --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+      --color-selasar: #166534;
+      --color-selasar-dark: #14532d;
+      --color-selasar-soft: #dcfce7;
+      --shadow-soft: 0 22px 70px rgba(20, 83, 45, 0.12);
+    }
+  </style>
+
+  <style>
+    .hero-bg {
+      background-image:
+        radial-gradient(circle at 15% 20%, rgba(22, 101, 52, 0.18), transparent 28%),
+        radial-gradient(circle at 90% 5%, rgba(34, 197, 94, 0.13), transparent 28%),
+        linear-gradient(135deg, #f9fafb 0%, #f0fdf4 58%, #ffffff 100%);
+    }
+
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(22, 101, 52, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(22, 101, 52, 0.055) 1px, transparent 1px);
+      background-size: 42px 42px;
+    }
+
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+
+<body class="bg-gray-50 font-sans text-gray-900 antialiased selection:bg-green-200 selection:text-green-950">
+  <header class="sticky top-0 z-50 border-b border-gray-100 bg-white/90 px-6 py-4 shadow-sm backdrop-blur-xl">
+    <nav class="mx-auto flex max-w-7xl items-center justify-between gap-6">
+      <a href="#home" class="flex items-center gap-3" aria-label="Selasar Home">
+        <img src="../src/assets/text-logo.png" alt="Selasar Logo" class="h-9 w-auto object-contain" />
+      </a>
+
+      <div class="hidden items-center gap-7 md:flex">
+        <a href="#home" class="font-semibold text-green-800">Beranda</a>
+        <a href="#fitur" class="font-medium text-gray-500 transition hover:text-green-700">Fitur</a>
+        <a href="#rekomendasi" class="font-medium text-gray-500 transition hover:text-green-700">Rekomendasi</a>
+        <a href="#cara-kerja" class="font-medium text-gray-500 transition hover:text-green-700">Cara Kerja</a>
+      </div>
+
+      <a href="#mulai" class="rounded-full bg-green-700 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-green-700/20 transition hover:-translate-y-0.5 hover:bg-green-800">
+        Cari Spot
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="hero-bg overflow-hidden px-6 py-14 md:px-12 md:py-20">
+      <div class="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+        <div>
+          <span class="inline-flex items-center gap-2 rounded-full border border-green-200 bg-white/80 px-4 py-2 text-sm font-bold text-green-800 shadow-sm">
+            <span class="h-2 w-2 rounded-full bg-green-500"></span>
+            Real-time study spot finder
+          </span>
+
+          <h1 class="mt-7 max-w-4xl font-serif text-5xl font-extrabold leading-[1.02] tracking-tight text-gray-950 md:text-7xl">
+            Cari tempat nugas yang pas sama mood lu.
+          </h1>
+
+          <p class="mt-6 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">
+            Selasar bantu lu nemuin cafe atau ruang belajar yang nyaman berdasarkan suasana, wifi, colokan, dan tingkat keramaian sebelum lu berangkat.
+          </p>
+
+          <div id="mulai" class="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a href="#rekomendasi" class="inline-flex items-center justify-center rounded-full bg-green-700 px-7 py-4 font-bold text-white shadow-xl shadow-green-700/20 transition hover:-translate-y-1 hover:bg-green-800">
+              Lihat Rekomendasi
+            </a>
+            <a href="#fitur" class="inline-flex items-center justify-center rounded-full border border-green-200 bg-white px-7 py-4 font-bold text-green-800 transition hover:-translate-y-1 hover:border-green-700">
+              Kenapa Selasar?
+            </a>
+          </div>
+
+          <div class="mt-9 grid max-w-xl grid-cols-3 gap-3">
+            <div class="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-green-100">
+              <p class="text-2xl font-black text-green-800">4+</p>
+              <p class="text-xs font-semibold text-gray-500">Spot awal</p>
+            </div>
+            <div class="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-green-100">
+              <p class="text-2xl font-black text-green-800">95%</p>
+              <p class="text-xs font-semibold text-gray-500">Info colokan</p>
+            </div>
+            <div class="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-green-100">
+              <p class="text-2xl font-black text-green-800">24/7</p>
+              <p class="text-xs font-semibold text-gray-500">Siap dicek</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="relative">
+          <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-green-200 blur-3xl"></div>
+          <div class="relative rounded-[2.3rem] bg-white p-5 shadow-soft ring-1 ring-green-100">
+            <div class="overflow-hidden rounded-[1.8rem] bg-gray-100">
+              <img src="https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1200&q=85" alt="Cafe nyaman untuk nugas" class="h-80 w-full object-cover" />
+            </div>
+
+            <div class="mt-5 rounded-[1.5rem] border border-gray-100 bg-gray-50 p-4">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm font-bold text-green-800">Ruang Seduh</p>
+                  <p class="text-xs font-medium text-gray-500">Aman buat fokus • Sunyi</p>
+                </div>
+                <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-800">Recommended</span>
+              </div>
+              <div class="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div class="rounded-2xl bg-white p-3">
+                  <p class="text-lg">📶</p>
+                  <p class="text-xs font-bold text-gray-600">Wifi bagus</p>
+                </div>
+                <div class="rounded-2xl bg-white p-3">
+                  <p class="text-lg">🔌</p>
+                  <p class="text-xs font-bold text-gray-600">95%</p>
+                </div>
+                <div class="rounded-2xl bg-white p-3">
+                  <p class="text-lg">👥</p>
+                  <p class="text-xs font-bold text-gray-600">5 orang</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fitur" class="grid-bg px-6 py-16 md:px-12">
+      <div class="mx-auto max-w-7xl">
+        <div class="max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.22em] text-green-700">Fitur utama</p>
+          <h2 class="mt-3 font-serif text-4xl font-bold text-gray-900 md:text-5xl">Biar gak salah pilih tempat nugas.</h2>
+          <p class="mt-4 text-lg leading-8 text-gray-600">Daripada udah sampai cafe tapi wifi jelek, colokan penuh, atau terlalu ramai, Selasar bantu kasih gambaran dulu dari indikator yang paling penting.</p>
+        </div>
+
+        <div class="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <article class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-green-100 text-2xl">🔌</div>
+            <h3 class="text-xl font-bold text-gray-900">Info colokan</h3>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Cek peluang colokan tersedia sebelum lu bawa laptop dan charger.</p>
+          </article>
+
+          <article class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-green-100 text-2xl">📶</div>
+            <h3 class="text-xl font-bold text-gray-900">Status wifi</h3>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Lihat kualitas internet buat meeting, upload tugas, atau riset deadline.</p>
+          </article>
+
+          <article class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-green-100 text-2xl">🔊</div>
+            <h3 class="text-xl font-bold text-gray-900">Level suasana</h3>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Pilih tempat sunyi, santai, atau ramai sesuai mode nugas lu.</p>
+          </article>
+
+          <article class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-green-100 text-2xl">👥</div>
+            <h3 class="text-xl font-bold text-gray-900">Jumlah pengunjung</h3>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Estimasi keramaian biar lu bisa pilih tempat yang paling nyaman.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="rekomendasi" class="px-6 py-16 md:px-12">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div>
+            <p class="text-sm font-black uppercase tracking-[0.22em] text-green-700">Rekomendasi spot</p>
+            <h2 class="mt-3 font-serif text-4xl font-bold text-gray-900 md:text-5xl">Tempat pilihan buat mulai nugas.</h2>
+          </div>
+          <div class="hide-scrollbar flex gap-2 overflow-x-auto pb-2 md:pb-0">
+            <button class="whitespace-nowrap rounded-full bg-green-700 px-5 py-2 text-sm font-semibold text-white">Fokus</button>
+            <button class="whitespace-nowrap rounded-full bg-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-green-700 hover:text-white">Santai</button>
+            <button class="whitespace-nowrap rounded-full bg-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-green-700 hover:text-white">Healing</button>
+            <button class="whitespace-nowrap rounded-full bg-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-green-700 hover:text-white">Deadline</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-4">
+          <article class="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="relative h-48 overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=700&q=80" alt="Kopi Nalar" class="h-full w-full object-cover transition duration-500 hover:scale-105" />
+              <span class="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-green-800 backdrop-blur-sm">🔌 80%</span>
+            </div>
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-bold text-gray-900">Kopi Nalar</h3>
+                  <p class="text-sm font-medium text-green-700">Aman buat fokus</p>
+                </div>
+                <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Fokus</span>
+              </div>
+              <div class="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-gray-50 p-3 text-sm text-gray-600">
+                <span>🔊 Tenang</span>
+                <span>📶 Bagus</span>
+                <span>👥 12 Orang</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="relative h-48 overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=700&q=80" alt="Titik Koma Coffee" class="h-full w-full object-cover transition duration-500 hover:scale-105" />
+              <span class="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-green-800 backdrop-blur-sm">🔌 40%</span>
+            </div>
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-bold text-gray-900">Titik Koma Coffee</h3>
+                  <p class="text-sm font-medium text-green-700">Santai buat diskusi</p>
+                </div>
+                <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Santai</span>
+              </div>
+              <div class="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-gray-50 p-3 text-sm text-gray-600">
+                <span>🔊 Lumayan</span>
+                <span>📶 Sedang</span>
+                <span>👥 32 Orang</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="relative h-48 overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=700&q=80" alt="Ruang Seduh" class="h-full w-full object-cover transition duration-500 hover:scale-105" />
+              <span class="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-green-800 backdrop-blur-sm">🔌 95%</span>
+            </div>
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-bold text-gray-900">Ruang Seduh</h3>
+                  <p class="text-sm font-medium text-green-700">Aman buat deadline</p>
+                </div>
+                <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Deadline</span>
+              </div>
+              <div class="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-gray-50 p-3 text-sm text-gray-600">
+                <span>🔊 Sunyi</span>
+                <span>📶 Kencang</span>
+                <span>👥 5 Orang</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div class="relative h-48 overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?auto=format&fit=crop&w=700&q=80" alt="Bilik Kopi" class="h-full w-full object-cover transition duration-500 hover:scale-105" />
+              <span class="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-green-800 backdrop-blur-sm">🔌 20%</span>
+            </div>
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-bold text-gray-900">Bilik Kopi</h3>
+                  <p class="text-sm font-medium text-green-700">Cocok buat healing</p>
+                </div>
+                <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Healing</span>
+              </div>
+              <div class="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-gray-50 p-3 text-sm text-gray-600">
+                <span>🔊 Ramai</span>
+                <span>📶 Bagus</span>
+                <span>👥 45 Orang</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="cara-kerja" class="bg-white px-6 py-16 md:px-12">
+      <div class="mx-auto max-w-7xl">
+        <div class="mx-auto max-w-3xl text-center">
+          <p class="text-sm font-black uppercase tracking-[0.22em] text-green-700">Cara kerja</p>
+          <h2 class="mt-3 font-serif text-4xl font-bold text-gray-900 md:text-5xl">Tiga langkah sebelum lu berangkat.</h2>
+        </div>
+
+        <div class="mt-10 grid gap-5 md:grid-cols-3">
+          <div class="rounded-3xl border border-gray-100 bg-gray-50 p-7 text-center">
+            <div class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-green-700 font-black text-white">1</div>
+            <h3 class="mt-5 text-xl font-bold text-gray-900">Pilih mood</h3>
+            <p class="mt-2 text-gray-600">Mau fokus, santai, healing, atau deadline mode.</p>
+          </div>
+          <div class="rounded-3xl border border-gray-100 bg-gray-50 p-7 text-center">
+            <div class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-green-700 font-black text-white">2</div>
+            <h3 class="mt-5 text-xl font-bold text-gray-900">Cek indikator</h3>
+            <p class="mt-2 text-gray-600">Lihat wifi, colokan, suara, dan estimasi pengunjung.</p>
+          </div>
+          <div class="rounded-3xl border border-gray-100 bg-gray-50 p-7 text-center">
+            <div class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-green-700 font-black text-white">3</div>
+            <h3 class="mt-5 text-xl font-bold text-gray-900">Datang & nugas</h3>
+            <p class="mt-2 text-gray-600">Pilih tempat yang paling aman buat produktif.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-16 md:px-12">
+      <div class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 rounded-[2.2rem] bg-green-800 p-8 text-white shadow-soft md:flex-row md:items-center md:p-10">
+        <div>
+          <p class="text-sm font-black uppercase tracking-[0.22em] text-green-100">Selasar</p>
+          <h2 class="mt-3 font-serif text-4xl font-bold md:text-5xl">Siap nemuin tempat nugas lu?</h2>
+          <p class="mt-3 max-w-2xl text-green-50">Landing page static HTML + TailwindCSS ini bisa langsung dibuka lewat VS Code Go Live.</p>
+        </div>
+        <a href="#rekomendasi" class="rounded-full bg-white px-7 py-4 font-bold text-green-800 transition hover:-translate-y-1 hover:bg-green-50">Mulai Sekarang</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-gray-100 bg-white px-6 py-8 md:px-12">
+    <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-sm text-gray-500 md:flex-row">
+      <p>© 2026 Selasar. Cari tempat nugas yang lebih nyaman.</p>
+      <div class="flex gap-5">
+        <a href="#fitur" class="hover:text-green-700">Fitur</a>
+        <a href="#rekomendasi" class="hover:text-green-700">Rekomendasi</a>
+        <a href="#cara-kerja" class="hover:text-green-700">Cara Kerja</a>
+      </div>
+    </div>
+  </footer>
+</body>
+
+</html>
