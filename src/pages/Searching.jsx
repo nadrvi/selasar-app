@@ -1,3 +1,12 @@
+import "react"
+import {
+  FaWifi,
+  FaUsers,
+  FaPlug,
+  FaSearch,
+  FaRegBookmark,
+} from "react-icons/fa";
+
 export default function Searching() {
   return (
     <div className="min-h-screen bg-[#F4EFE8] p-6">
@@ -13,6 +22,19 @@ export default function Searching() {
   </div>
 </div>
 
+      <div className="flex justify-center mb-6">
+        <div className="flex bg-white rounded-full border shadow-sm overflow-hidden w-full max-w-md">
+          <input
+            type="text"
+            placeholder="Mau nugas di mana hari ini?"
+            className="flex-1 px-4 py-2 outline-none text-sm"
+          />
+
+          <button className="px-4 text-[#5E4B45]">
+            <FaSearch />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
