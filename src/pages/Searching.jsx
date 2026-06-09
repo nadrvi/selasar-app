@@ -1,8 +1,18 @@
 export default function Searching() {
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-3xl font-bold text-green-800">Selasar Serching</h1>
-      <p className="text-gray-600 mt-2">Cari tempat nugas nyaman lu di sini.</p>
+    <div className="min-h-screen bg-[#F4EFE8] p-6">
+      <div className="flex justify-center mb-6">
+  <div className="text-center">
+    <h1 className="text-5xl font-serif text-[#38442E] font-bold">
+      Selasar
+    </h1>
+
+    <p className="text-[10px] tracking-[3px] text-[#8B6B4F]">
+      TEMPAT NYAMAN, IDE BERKEMBANG
+    </p>
+  </div>
+</div>
+
     </div>
   );
 }
