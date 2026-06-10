@@ -35,6 +35,14 @@ export default function Searching() {
           </button>
         </div>
       </div>
+
+<div className="bg-white rounded-2xl p-4 shadow-md mb-8">
+
+  <h2 className="font-semibold text-[#4A3B35] mb-4">
+    Pilih suasana yang kamu butuhkan
+  </h2>
+
+</div>
     </div>
   );
 }
