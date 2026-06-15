@@ -206,15 +206,15 @@ export default function Register() {
                       className="w-full pl-2 pr-10 py-3 text-sm sm:text-base text-center rounded-full bg-[#EBE5DC] text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#52413E] transition-all"
                     />
 
-                    <div className="absolute right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden hover:bg-[#7d6858] transition-colors cursor-pointer">
-                      <div className="w-full h-full bg-[#937C6A] flex items-center justify-center text-white pointer-events-none rounded-lg">
+                    <div className="absolute right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden hover:bg-[#7d6858] transition-colors ">
+                      <div className="w-full h-full bg-[#937C6A] flex items-center justify-center text-white  rounded-lg ">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
                           viewBox="0 0 24 24"
                           strokeWidth={2}
                           stroke="currentColor"
-                          className="w-4 h-4 sm:w-5 sm:h-5"
+                          className="w-4 h-4 sm:w-5 sm:h-5 "
                         >
                           <path
                             strokeLinecap="round"
@@ -225,7 +225,7 @@ export default function Register() {
                       </div>
                       <input
                         type="date"
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        className="absolute inset-0 w-full h-full opacity-0"
                         onChange={(e) => {
                           if (!e.target.value) return;
                           const [year, month, day] = e.target.value.split("-");
@@ -286,7 +286,7 @@ export default function Register() {
               {/* Tombol Register */}
               <button
                 type="submit"
-                className="w-full mt-4 bg-[#4A3B38] hover:bg-[#342927] text-white font-semibold py-3 rounded-full transition-all shadow-md text-sm sm:text-base"
+                className="w-full mt-4 bg-[#4A3B38] hover:bg-[#342927] text-white font-semibold py-3 rounded-full transition-all shadow-md text-sm sm:text-base cursor-pointer"
               >
                 Register
               </button>
