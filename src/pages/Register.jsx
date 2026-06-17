@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 // import logoSelasar from "../assets/logo.png";
 import Daun from "../assets/daun.png";
-import TextSelasar from "../assets/text-logo.png";
+import TextSelasar from "../assets/text-logo2.png";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -75,7 +75,7 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-neutral-800 flex items-center justify-center p-4 sm:p-6 md:p-8">
       {/* Container Utama */}
-      <div className="flex flex-col md:flex-row rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden max-w-[1000px] w-full md:min-h-[300px] bg-[#C0B3A4]">
+      <div className="flex flex-col md:flex-row md:rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden max-w-[1000px] w-full md:min-h-[300px] bg-[#BCAA97]">
         {/* SISI KIRI (Area Form) */}
         <div className="md:w-[60%] flex flex-col relative ">
           {/* Header Cokelat Tua (Hanya muncul di Mobile/sm) */}
@@ -295,7 +295,7 @@ export default function Register() {
         </div>
 
         {/* SISI KANAN (Area Logo) - Hide di HP, Muncul di tablet ke atas */}
-        <div className="hidden md:flex md:w-[40%] bg-[#F0EBE3] flex-col items-center justify-center p-10 relative">
+        <div className="hidden md:flex md:w-[40%] bg-[#EDE8DE] flex-col items-center justify-center p-10 relative">
           <img
             src={Daun}
             alt="Daun"
