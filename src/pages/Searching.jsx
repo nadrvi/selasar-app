@@ -4,6 +4,7 @@ import {
   FaUsers,
   FaPlug,
   FaSearch,
+  FaMapMarkerAlt,
   FaRegBookmark,
 } from "react-icons/fa";
 
@@ -157,29 +158,43 @@ export default function Searching() {
             </span>
           </div>
 
-          <p className="text-xs text-gray-500 mb-4">
-            Jl Otto Iskandardinata No.13
+          <p className="text-xs text-gray-500 flex items-center gap-1">
+            <FaMapMarkerAlt size={10} />
+            Jl. Otto Iskandardinata No. 13
           </p>
 
-          <div className="grid grid-cols-3 text-xs mb-4">
+          <div className="grid grid-cols-4 text-xs mb-4">
             <div>
-              <p className="font-semibold">Colokan</p>
+              <p className="font-semibold flex items-center gap-1">
+                Colokan <FaPlug size={12} />
+              </p>
               <p>Terbatas</p>
             </div>
 
             <div>
-              <p className="font-semibold">WiFi</p>
+              <p className="font-semibold flex items-center gap-1">
+                WiFi <FaWifi size={12} />
+              </p>
               <p>Cepat</p>
             </div>
 
             <div>
-              <p className="font-semibold">3-5 Orang</p>
+              <p className="font-semibold flex items-center gap-1">
+                <FaUsers size={12} />
+                3-5 Orang
+              </p>
               <p>Cocok</p>
+            </div>
+              <div className="flex justify-end items-center">
+              <FaRegBookmark
+                size={20}
+                className="text-[#5E4B45]"
+              />
             </div>
           </div>
 
           <div className="flex justify-between items-end">
-            <p className="text-xs">
+            <p className="font-semibold text-[#4A3B35]">
               Cocok untuk: Me time, Hangout
             </p>
 
@@ -190,6 +205,70 @@ export default function Searching() {
         </div>
       </div>
       
+        <div className="bg-white rounded-2xl overflow-hidden shadow-md flex">
+        <img
+          src="https://images.unsplash.com/photo-1554118811-1e0d58224f24"
+          alt="cafe"
+          className="w-40 object-cover"
+        />
+
+        <div className="p-4 flex-1">
+          <div className="flex justify-between">
+            <h3 className="font-bold text-[#4A3B35]">
+              Kopi Nalar
+            </h3>
+
+            <span className="text-xs bg-[#EFE7E2] px-2 py-1 rounded-full">
+              Cafe
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-500 mb-4">
+            Jl. Haji Nawi Jakarta Selatan
+          </p>
+
+          <div className="grid grid-cols-4 text-xs mb-4">
+            <div>
+              <p className="font-semibold flex items-center gap-1">
+                Colokan <FaPlug size={12} />
+              </p>
+              <p>Terbatas</p>
+            </div>
+
+            <div>
+              <p className="font-semibold flex items-center gap-1">
+                WiFi <FaWifi size={12} />
+              </p>
+              <p>Cepat</p>
+            </div>
+
+            <div>
+              <p className="font-semibold flex items-center gap-1">
+                <FaUsers size={12} />
+                2-4 Orang
+              </p>
+              <p>Cocok</p>
+            </div>
+
+              <div className="flex justify-end items-center">
+              <FaRegBookmark
+                size={20}
+                className="text-[#5E4B45]"
+              />
+              </div>
+          </div>
+
+          <div className="flex justify-between items">
+            <p className="font-semibold text-[#4A3B35]">
+              Cocok untuk: Me time, WFC
+            </p>
+
+            <div className="bg-[#EFE7E2] px-2 py-1 rounded text-xs font-semibold">
+              95% Match
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
