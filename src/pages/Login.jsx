@@ -1,28 +1,43 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logoSelasar from "../assets/logo.png";
-import textLogo from "../assets/text-logo.png";
+import Daun from "../assets/Daun.png";
+import DaunBawah from "../assets/Daun_half.png";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
   const [errors, setErrors] = useState({});
-  const [globalError, setGlobalError] = useState("");
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+
+    if (errors[e.target.name]) {
+      setErrors({
+        ...errors,
+        [e.target.name]: "",
+      });
+    }
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
-    let newErrors = {};
-    setGlobalError("");
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) {
+    let newErrors = {};
+
+    if (!formData.email) {
       newErrors.email = "Email wajib diisi.";
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = "Format email tidak valid.";
     }
 
-    if (!password) {
+    if (!formData.password) {
       newErrors.password = "Password wajib diisi.";
     }
 
@@ -31,82 +46,146 @@ export default function Login() {
       return;
     }
 
-    const storedUser = localStorage.getItem("selasarUser");
+    const storedUser = JSON.parse(localStorage.getItem("selasarUser"));
+
     if (!storedUser) {
-      setGlobalError("Akun tidak ditemukan. Silakan daftar dulu.");
+      setErrors({
+        email: "Akun tidak ditemukan.",
+      });
       return;
     }
 
-    const userData = JSON.parse(storedUser);
-    if (email === userData.email && password === userData.password) {
-      localStorage.setItem("isLoggedIn", "true");
-      alert(`Selamat datang kembali, ${userData.name}!`);
-      navigate("/beranda"); 
-    } else {
-      setGlobalError("Email atau Password salah.");
+    if (
+      storedUser.email !== formData.email ||
+      storedUser.password !== formData.password
+    ) {
+      setErrors({
+        password: "Email atau password salah.",
+      });
+      return;
     }
+
+    localStorage.setItem("isLoggedIn", "true");
+
+    alert(`Selamat datang kembali, ${storedUser.name}!`);
+
+    navigate("/beranda");
   };
 
   return (
-    <div className="min-h-screen bg-neutral-800 flex items-center justify-center p-4">
-      {/* Container: Otomatis vertikal (flex-col) di hp/tablet, horizontal (md:flex-row) di desktop */}
-      <div className="flex flex-col md:flex-row bg-white rounded-3xl shadow-xl overflow-hidden max-w-4xl w-full min-h-[500px]">
-        
-        {/* Sisi Kiri (Desktop) / Atas (Mobile): Area Logo Utama */}
-        <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col items-center justify-center bg-white border-b md:border-b-0 md:border-r border-gray-200">
-          <img 
-            src={logoSelasar} 
-            alt="Logo Selasar" 
-            className="w-44 md:w-72 h-auto object-contain drop-shadow-sm hover:scale-105 transition-transform duration-300"
+    <div className="min-h-screen bg-neutral-800 flex items-center justify-center p-4 sm:p-6">
+      {/* CARD */}
+      <div className="w-full max-w-[1000px] min-h-[600px] flex flex-col md:flex-row rounded-[2rem] overflow-hidden shadow-2xl">
+        {/* MOBILE LOGO */}
+        <div className="md:hidden bg-[#F0EBE3] flex justify-center items-center py-10 ">
+          <img
+            src={logoSelasar}
+            alt="Selasar"
+            className="w-44 sm:w-52 object-contain"
           />
         </div>
 
-        {/* Sisi Kanan (Desktop) / Bawah (Mobile): Area Form */}
-        <div className="w-full md:w-1/2 p-8 md:p-10 bg-gray-100 flex flex-col justify-center items-center">
-          
-          {/* textLogo: Sembunyi di hp/tablet (hidden), muncul mulai dari desktop (md:block) */}
-          <img 
-            src={textLogo} 
-            alt="Selasar Typography" 
-            className="hidden md:block h-20 w-auto object-contain mb-8 drop-shadow-sm"
+        {/* LEFT SIDE DESKTOP */}
+        <div className="hidden md:flex md:w-[60%] bg-[#F0EBE3] items-center justify-center">
+          <img
+            src={logoSelasar}
+            alt="Selasar"
+            className="w-[280px] lg:w-[340px] object-contain"
           />
-          
-          <form onSubmit={handleLogin} className="w-full max-w-sm flex flex-col gap-4">
-            {globalError && <div className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm text-center font-medium">{globalError}</div>}
+        </div>
 
-            <div>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setErrors({...errors, email: ""}); }}
-                placeholder="Email" 
-                className={`w-full px-4 py-3 rounded-full bg-gray-200 text-gray-700 outline-none focus:ring-2 transition-all ${errors.email ? 'border-2 border-red-500 focus:ring-red-500' : 'focus:ring-green-700'}`}
+        {/* RIGHT SIDE */}
+        <div className="w-full md:w-[40%] bg-[#967E72]  relative flex items-center justify-center p-8 sm:p-10 md:p-9 overflow-hidden">
+          {/* DAUN ATAS */}
+          <img
+            src={Daun}
+            alt="Daun"
+            className="absolute -top-10 right-0  md:w-49 opacity-90 "
+          />
+
+          {/* DAUN BAWAH */}
+          <img
+            src={DaunBawah}
+            alt="Daun"
+            className="absolute -bottom-3 -left-10  md:w-70  opacity-90   "
+          />
+
+          {/* FORM */}
+          <form
+            onSubmit={handleLogin}
+            className="w-full max-w-[320px] flex flex-col relative z-10 md:translate-y-4"
+          >
+            {/* EMAIL */}
+            <div className="mb-2">
+              <input
+                type="text"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Email or Phone Number"
+                className={`w-full px-5 py-3 rounded-full bg-[#F2EEE8] text-gray-700 text-sm sm:text-base outline-none transition-all ${
+                  errors.email
+                    ? "border-2 border-red-500"
+                    : "focus:ring-2 focus:ring-[#5B4744]"
+                }`}
               />
-              {errors.email && <p className="text-xs text-red-500 mt-1 ml-2">{errors.email}</p>}
+
+              <div className="h-5 mt-1">
+                {errors.email && (
+                  <p className="text-xs text-red-200">{errors.email}</p>
+                )}
+              </div>
             </div>
 
-            <div>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setErrors({...errors, password: ""}); }}
-                placeholder="Password" 
-                className={`w-full px-4 py-3 rounded-full bg-gray-200 text-gray-700 outline-none focus:ring-2 transition-all ${errors.password ? 'border-2 border-red-500 focus:ring-red-500' : 'focus:ring-green-700'}`}
+            {/* PASSWORD */}
+            <div className="mb-2">
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Password"
+                className={`w-full px-5 py-3 rounded-full bg-[#F2EEE8] text-gray-700 text-sm sm:text-base outline-none transition-all ${
+                  errors.password
+                    ? "border-2 border-red-500"
+                    : "focus:ring-2 focus:ring-[#5B4744]"
+                }`}
               />
-              {errors.password && <p className="text-xs text-red-500 mt-1 ml-2">{errors.password}</p>}
+
+              <div className="h-5 mt-1">
+                {errors.password && (
+                  <p className="text-xs text-red-200">{errors.password}</p>
+                )}
+              </div>
             </div>
-            
-            <button type="submit" className="w-full mt-2 bg-gray-400 hover:bg-green-700 text-white font-semibold py-3 rounded-full transition-all shadow-md cursor-pointer">
+
+            {/* LOGIN */}
+            <button
+              type="submit"
+              className="w-full bg-[#5B4744] hover:bg-[#463633] text-white py-3 rounded-full font-semibold transition-all"
+            >
               Login
             </button>
-          </form>
 
-          <p className="mt-6 text-sm text-gray-600">
-            Belum punya akun?{" "}
-            <Link to="/register" className="text-green-700 font-semibold hover:underline">
-              Daftar di sini
+            {/* FORGOT */}
+            <Link
+              to="#"
+              className="text-center text-xs text-white mt-3 hover:underline"
+            >
+              Forgot password?
             </Link>
-          </p>
+
+            {/* SPACER */}
+            <div className="h-8"></div>
+
+            {/* REGISTER */}
+            <Link
+              to="/register"
+              className="w-full bg-white hover:bg-gray-100 text-[#5B4744] py-3 rounded-full text-center border border-[#5B4744] font-semibold transition-all"
+            >
+              New account
+            </Link>
+          </form>
         </div>
       </div>
     </div>
