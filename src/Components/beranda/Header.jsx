@@ -1,4 +1,4 @@
-import React from 'react';
+import 'react';
 import { Settings, User } from 'lucide-react';
 import myLogo from '../../assets/text-logo.png';
 

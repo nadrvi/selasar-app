@@ -1,5 +1,5 @@
 // src/components/LocationCard.jsx
-import React from 'react';
+import 'react';
 import { Zap, Users, Wifi, Target, Sparkles, CheckCircle2 } from 'lucide-react';
 
 const LocationCard = ({ locationData }) => {

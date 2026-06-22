@@ -1,5 +1,5 @@
 // src/components/LocationCardGrid.jsx
-import React from 'react';
+import 'react';
 import LocationCard from './LocationCard';
 
 const locations = [

@@ -1,5 +1,5 @@
 // src/components/FilterArea.jsx
-import React from 'react';
+import 'react';
 import { Search } from 'lucide-react';
 
 const FilterArea = () => {

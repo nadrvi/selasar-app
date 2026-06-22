@@ -1,5 +1,5 @@
 // src/components/MapArea.jsx
-import React from 'react';
+import  'react';
 import { ZoomIn, ZoomOut, MapPin } from 'lucide-react';
 
 const MapArea = () => {
