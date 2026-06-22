@@ -7,11 +7,9 @@ import {
   FaMapMarkerAlt,
   FaRegBookmark,
 } from "react-icons/fa";
-// Pastikan path text-logo ini sesuai dengan folder struktur lu
 import TextSelasar from "../assets/text-logo.png";
 
 export default function Searching() {
-  // State biar tombol filternya bisa di-klik dan berubah warna (Interaktif)
   const [activeFilters, setActiveFilters] = useState({
     colokan: "Tersedia",
     wifi: "30+ Mbps",
