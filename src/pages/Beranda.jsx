@@ -19,7 +19,7 @@ export default function Beranda() {
             Beranda
           </Link>
           <Link
-            to="/search"
+            to="/searching"
             className="text-gray-500 hover:text-green-700 transition-colors"
           >
             Cari
