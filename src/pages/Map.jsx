@@ -49,3 +49,65 @@ export default function Map() {
           </div>
         </div>
 
+        {/* FILTER */}
+        <div className="flex justify-center gap-3 mt-5 flex-wrap">
+
+          <button className="bg-[#6B554F] text-white px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+            Semua
+          </button>
+
+          <button className="bg-white px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow">
+            <FaCoffee />
+            Cafe
+          </button>
+
+          <button className="bg-white px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow">
+            <FaUsers />
+            Coworking
+          </button>
+
+          <button className="bg-white px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow">
+            <FaBook />
+            Perpustakaan
+          </button>
+
+          <button className="bg-white px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow">
+            <FaTree />
+            Alam
+          </button>
+
+        </div>
+
+      </div>
+
+      {/* MAP */}
+      <div className="relative max-w-7xl mx-auto h-[700px] rounded-3xl overflow-hidden shadow-xl">
+
+        {/* MAP IMAGE */}
+        <img
+          src="https://images.unsplash.com/photo-1524661135-423995f22d0b"
+          alt="Map"
+          className="w-full h-full object-cover opacity-30"
+        />
+
+        {/* MARKER USER */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2">
+
+          <div className="w-28 h-28 bg-blue-400/20 rounded-full absolute -left-12 -top-12"></div>
+
+          <div className="w-6 h-6 bg-blue-500 rounded-full border-4 border-white relative z-10"></div>
+
+        </div>
+
+        {/* MARKER SELASAR */}
+        <div className="absolute left-[50%] top-[43%]">
+
+          <div className="w-20 h-20 bg-[#556B2F] rounded-full flex items-center justify-center shadow-xl">
+
+            <span className="text-white text-3xl">
+              🌿
+            </span>
+
+          </div>
+
+        </div>
