@@ -111,3 +111,83 @@ export default function Map() {
           </div>
 
         </div>
+
+        {/* LOCATION CARD 1 */}
+        <div className="absolute top-20 left-12 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
+
+          <h3 className="font-bold text-[#5E4B45]">
+            Kopi Selasar
+          </h3>
+
+          <p className="text-gray-500 text-sm">
+            250 m
+          </p>
+
+        </div>
+
+        {/* LOCATION CARD 2 */}
+        <div className="absolute top-32 right-32 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
+
+          <h3 className="font-bold text-[#5E4B45]">
+            CoWork Hub
+          </h3>
+
+          <p className="text-gray-500 text-sm">
+            650 m
+          </p>
+
+        </div>
+
+        {/* LOCATION CARD 3 */}
+        <div className="absolute bottom-40 left-20 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
+
+          <h3 className="font-bold text-[#5E4B45]">
+            Perpus Kota
+          </h3>
+
+          <p className="text-gray-500 text-sm">
+            1.2 km
+          </p>
+
+        </div>
+
+        {/* LOCATION CARD 4 */}
+        <div className="absolute bottom-44 right-24 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
+
+          <h3 className="font-bold text-[#5E4B45]">
+            Ruang Teduh
+          </h3>
+
+          <p className="text-gray-500 text-sm">
+            400 m
+          </p>
+
+        </div>
+
+        {/* LOCATION CARD 5 */}
+        <div className="absolute bottom-20 left-[40%] bg-white rounded-2xl p-4 shadow-xl w-[220px]">
+
+          <h3 className="font-bold text-[#5E4B45]">
+            Taman Literasi
+          </h3>
+
+          <p className="text-gray-500 text-sm">
+            800 m
+          </p>
+
+        </div>
+
+        {/* MAP BUTTONS */}
+        <div className="absolute bottom-6 right-6 flex flex-col gap-3">
+
+          <button className="w-12 h-12 rounded-full bg-white shadow flex items-center justify-center">
+            <FaCrosshairs />
+          </button>
+
+          <button className="w-12 h-12 rounded-full bg-white shadow flex items-center justify-center">
+            <FaLocationArrow />
+          </button>
+
+        </div>
+
+      </div>
