@@ -9,7 +9,6 @@ function App() {
   return (
     <Router>
       <div className="font-sans text-gray-900">
-        {/* Nanti Navbar ditaruh di sini biar muncul di semua halaman */}
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
