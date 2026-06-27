@@ -69,14 +69,12 @@ export default function Login() {
     localStorage.setItem("isLoggedIn", "true");
     alert(`Selamat datang, ${storedUser.name}!`);
 
-    // Mainkan animasi keluar sebelum ke beranda
     setIsExiting(true);
     setTimeout(() => {
       navigate("/beranda");
     }, 500);
   };
 
-  // Fungsi untuk pindah ke register dengan animasi
   const handleGoToRegister = () => {
     setIsExiting(true);
     setTimeout(() => {

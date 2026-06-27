@@ -81,14 +81,12 @@ export default function Register() {
     localStorage.setItem("selasarUser", JSON.stringify(userAccount));
     alert("Akun berhasil dibuat! Silakan login.");
     
-    // Mainkan animasi keluar pas sukses register
     setIsExiting(true);
     setTimeout(() => {
       navigate("/");
     }, 500);
   };
 
-  // Fungsi untuk tombol kembali ke Login dengan animasi
   const handleBackToLogin = (e) => {
     e.preventDefault();
     setIsExiting(true);
@@ -103,10 +101,10 @@ export default function Register() {
       <div 
         className={`flex flex-col md:flex-row md:rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden max-w-[1000px] w-full md:min-h-[300px] bg-[#BCAA97] transition-all duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
           isExiting 
-            ? "opacity-0 scale-105 -translate-y-12" // Animasi keluar
+            ? "opacity-0 scale-105 -translate-y-12" 
             : isLoaded 
-              ? "opacity-100 scale-100 translate-y-0" // Posisi normal
-              : "opacity-0 scale-95 translate-y-12" // Animasi awal masuk
+              ? "opacity-100 scale-100 translate-y-0" 
+              : "opacity-0 scale-95 translate-y-12" 
         }`}
       >
         {/* SISI KIRI (Area Form) */}
