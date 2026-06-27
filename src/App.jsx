@@ -4,6 +4,7 @@ import Register from "./pages/Register";
 import Beranda from "./pages/Beranda";
 import Searching from "./pages/Searching";
 import Profile from "./pages/Profile";
+import Map from "./pages/Map";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/beranda" element={<Beranda />} />
           <Route path="/searching" element={<Searching />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/map" element= {<Map/>} />
         </Routes>
       </div>
     </Router>
