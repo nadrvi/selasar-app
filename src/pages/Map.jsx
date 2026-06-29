@@ -11,6 +11,7 @@ import {
   FaLocationArrow,
   FaCrosshairs,
 } from "react-icons/fa";
+import { PiLeafFill } from "react-icons/pi";
 
 export default function Map() {
   return (
@@ -100,13 +101,27 @@ export default function Map() {
         </div>
 
         {/* MARKER SELASAR */}
-        <div className="absolute left-[50%] top-[43%]">
+        <div className="absolute left-[50%] top-[43%] -translate-x-1/2 -translate-y-1/2">
 
-          <div className="w-20 h-20 bg-[#556B2F] rounded-full flex items-center justify-center shadow-xl">
+          <div className="relative">
 
-            <span className="text-white text-3xl">
-              🌿
-            </span>
+            {/* Pin */}
+            <div className="w-16 h-16 bg-[#556B2F] rounded-full flex items-center justify-center shadow-xl">
+
+              {/* Icon Daun */}
+              <PiLeafFill
+                  size={30}
+                  className="text-white"
+              />
+
+            </div>
+
+            {/* Ujung Pin */}
+            <div
+              className="absolute left-1/2 -translate-x-1/2 -bottom-3
+                        w-5 h-5 bg-[#556B2F]
+                        rotate-45">
+            </div>
 
           </div>
 
@@ -115,79 +130,235 @@ export default function Map() {
         {/* LOCATION CARD 1 */}
         <div className="absolute top-20 left-12 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
 
-          <h3 className="font-bold text-[#5E4B45]">
-            Kopi Selasar
-          </h3>
+          <div className="flex items-center">
 
-          <p className="text-gray-500 text-sm">
-            250 m
-          </p>
+            {/* Icon */}
+            <div className="w-10 h-10 rounded-full bg-[#7A5230] flex items-center justify-center mr-3 flex-shrink-0">
+              <FaCoffee className="text-white text-sm" />
+            </div>
+
+            {/* Text */}
+            <div>
+              <h3 className="font-bold text-[#5E4B45] text-lg leading-5">
+                Kopi Selasar
+              </h3>
+
+              <p className="text-gray-500 text-sm mt-1">
+                250 m
+              </p>
+            </div>
+
+          </div>
 
         </div>
 
         {/* LOCATION CARD 2 */}
         <div className="absolute top-32 right-32 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
 
-          <h3 className="font-bold text-[#5E4B45]">
-            CoWork Hub
-          </h3>
+          <div className="flex items-center">
 
-          <p className="text-gray-500 text-sm">
-            650 m
-          </p>
+            <div className="w-10 h-10 rounded-full bg-[#7A5230] flex items-center justify-center mr-3 flex-shrink-0">
+              <FaUsers className="text-white text-sm" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-[#5E4B45] text-lg leading-5">
+                CoWork Hub
+              </h3>
+
+              <p className="text-gray-500 text-sm mt-1">
+                650 m
+              </p>
+            </div>
+
+          </div>
 
         </div>
 
         {/* LOCATION CARD 3 */}
         <div className="absolute bottom-40 left-20 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
 
-          <h3 className="font-bold text-[#5E4B45]">
-            Perpus Kota
-          </h3>
+          <div className="flex items-center">
 
-          <p className="text-gray-500 text-sm">
-            1.2 km
-          </p>
+            <div className="w-10 h-10 rounded-full bg-[#6B563D] flex items-center justify-center mr-3 flex-shrink-0">
+              <FaBook className="text-white text-sm" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-[#5E4B45] text-lg leading-5">
+                Perpus Kota
+              </h3>
+
+              <p className="text-gray-500 text-sm mt-1">
+                1.2 km
+              </p>
+            </div>
+
+          </div>
 
         </div>
 
         {/* LOCATION CARD 4 */}
         <div className="absolute bottom-44 right-24 bg-white rounded-2xl p-4 shadow-xl w-[220px]">
 
-          <h3 className="font-bold text-[#5E4B45]">
-            Ruang Teduh
-          </h3>
+          <div className="flex items-center">
 
-          <p className="text-gray-500 text-sm">
-            400 m
-          </p>
+            <div className="w-10 h-10 rounded-full bg-[#7A5230] flex items-center justify-center mr-3 flex-shrink-0">
+              <FaCoffee className="text-white text-sm" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-[#5E4B45] text-lg leading-5">
+                Ruang Teduh
+              </h3>
+
+              <p className="text-gray-500 text-sm mt-1">
+                400 m
+              </p>
+            </div>
+
+          </div>
 
         </div>
 
         {/* LOCATION CARD 5 */}
         <div className="absolute bottom-20 left-[40%] bg-white rounded-2xl p-4 shadow-xl w-[220px]">
 
-          <h3 className="font-bold text-[#5E4B45]">
-            Taman Literasi
-          </h3>
+          <div className="flex items-center">
 
-          <p className="text-gray-500 text-sm">
-            800 m
-          </p>
+            <div className="w-10 h-10 rounded-full bg-[#556B2F] flex items-center justify-center mr-3 flex-shrink-0">
+              <FaTree className="text-white text-sm" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-[#5E4B45] text-lg leading-5">
+                Taman Literasi
+              </h3>
+
+              <p className="text-gray-500 text-sm mt-1">
+                800 m
+              </p>
+            </div>
+
+          </div>
 
         </div>
 
-        {/* MAP BUTTONS */}
-        <div className="absolute bottom-6 right-6 flex flex-col gap-3">
+        {/* FLOATING MAP BUTTON */}
+        <div className="absolute bottom-20 right-6 flex flex-col gap-3 z-50">
 
-          <button className="w-12 h-12 rounded-full bg-white shadow flex items-center justify-center">
-            <FaCrosshairs />
+          {/* Current Location */}
+          <button
+            className="w-12 h-12 bg-white rounded-full shadow-lg
+                      flex items-center justify-center
+                      hover:scale-105 transition"
+          >
+            <FaCrosshairs
+              size={18}
+              className="text-[#5E4B45]"
+            />
           </button>
 
-          <button className="w-12 h-12 rounded-full bg-white shadow flex items-center justify-center">
-            <FaLocationArrow />
+          {/* Navigation */}
+          <button
+            className="w-12 h-12 bg-white rounded-full shadow-lg
+                      flex items-center justify-center
+                      hover:scale-105 transition"
+          >
+            <FaLocationArrow
+              size={18}
+              className="text-[#5E4B45] -rotate-45"
+            />
           </button>
 
         </div>
 
       </div>
+
+      {/* DETAIL CARD */}
+      <div className="max-w-7xl mx-auto px-6 -mt-20 relative z-10 pb-10">
+
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden flex">
+
+          {/* IMAGE */}
+          <img
+            src="https://images.unsplash.com/photo-1506744038136-46273834b3fb"
+            alt="Kebon Raya"
+            className="w-[350px] h-[240px] object-cover"
+          />
+
+          {/* CONTENT */}
+          <div className="flex-1 p-6">
+
+            <div className="flex justify-between">
+
+              <div>
+                <h2 className="text-3xl font-bold text-[#5E4B45]">
+                  Kebon Raya Escape
+                </h2>
+
+                <div className="flex items-center gap-1 text-sm text-gray-500">
+                  <FaMapMarkerAlt />
+                  Jl. Otto Iskandardinata No.13
+                </div>
+              </div>
+
+              <span className="px-4 py-2 bg-[#EFE7E2] rounded-xl">
+                Alam
+              </span>
+
+            </div>
+
+            <div className="grid grid-cols-4 mt-6 text-sm">
+
+              <div>
+                <p className="font-semibold flex items-center gap-1">
+                  Colokan <FaPlug />
+                </p>
+                <p>Terbatas</p>
+              </div>
+
+              <div>
+                <p className="font-semibold flex items-center gap-1">
+                  WiFi <FaWifi />
+                </p>
+                <p>Cepat</p>
+              </div>
+
+              <div>
+                <p className="font-semibold flex items-center gap-1">
+                  <FaUsers />
+                  3-5 orang
+                </p>
+                <p>Cocok</p>
+              </div>
+
+              <div className="flex justify-end">
+                <FaBookmark size={22} />
+              </div>
+
+            </div>
+
+            <div className="border-t my-5"></div>
+
+            <div className="flex justify-between items-center">
+
+              <p>
+                Cocok untuk: Me time, Hangout
+              </p>
+
+              <div className="bg-[#EFE7E2] px-4 py-2 rounded-xl font-semibold">
+                80% Match
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
