@@ -16,7 +16,7 @@ function App() {
           <Route path="/beranda" element={<Beranda />} />
           <Route path="/searching" element={<Searching />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/map" element= {<Map/>} />
+          <Route path="/map" element={<Map />} />
         </Routes>
       </div>
     </Router>
