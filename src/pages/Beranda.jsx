@@ -5,29 +5,26 @@ import { placesData } from "../data/place";
 
 export default function Beranda() {
   const navigate = useNavigate();
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [destination, setDestination] = useState(null); // Ganti dari isTransitioning
+  const isTransitioning = !!destination;
   const [isLoaded, setIsLoaded] = useState(false); // State baru untuk animasi masuk
 
-  // Trigger animasi masuk sesaat setelah load
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoaded(true);
-    }, 50);
+    const timer = setTimeout(() => setIsLoaded(true), 50);
     return () => clearTimeout(timer);
   }, []);
 
-  // useEffect untuk memindahkan halaman sesaat sebelum animasi selesai
   useEffect(() => {
-    if (isTransitioning) {
+    if (destination) {
       const timer = setTimeout(() => {
-        navigate("/searching");
-      }, 500);
+        navigate(destination);
+      }, 500); 
       return () => clearTimeout(timer);
     }
-  }, [isTransitioning, navigate]);
+  }, [destination, navigate]);
 
-  const handleSearchClick = () => {
-    setIsTransitioning(true);
+  const handleNavigate = (path) => {
+    setDestination(path);
   };
 
   return (
@@ -36,7 +33,7 @@ export default function Beranda() {
     >
       {/* Header / Navbar */}
       <nav
-        className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-500 ${isTransitioning ? "opacity-0 -translate-y-4" : "opacity-100 translate-y-0"}`}
+        className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-700 ease-smooth ${isTransitioning ? "opacity-0 -translate-y-8" : "opacity-100"}`}
       >
         <div className="w-[76px]"></div>
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
@@ -65,10 +62,11 @@ export default function Beranda() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex flex-col items-center">
         {/* Kontainer Peta */}
         <div
-          className={`w-full h-[280px] bg-[#e5e5e5] rounded-[2.5rem] border-2 border-gray-200 overflow-hidden relative shadow-sm transition-all duration-700 ease-in-out ${
+          onClick={() => handleNavigate("/map")}
+          className={`w-full h-[280px] transition-all duration-700 ease-smooth ${
             isTransitioning
-              ? "opacity-0 scale-95 pointer-events-none"
-              : "opacity-100 scale-100"
+              ? "opacity-0 scale-[0.98] blur-sm"
+              : "opacity-100 scale-100 hover:shadow-lg"
           }`}
         >
           <iframe
@@ -99,11 +97,11 @@ export default function Beranda() {
 
         {/* Search Bar*/}
         <div
-          onClick={handleSearchClick}
-          className={`flex w-full max-w-[480px] relative shadow-lg rounded-full bg-[#fdfcfa] border border-gray-300 h-14 cursor-text transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+          onClick={() => handleNavigate("/searching")}
+          className={`flex w-full max-w-[480px] relative shadow-lg rounded-full bg-[#fdfcfa] border border-gray-300 h-14 cursor-text transition-all duration-700 ease-smooth ${
             isTransitioning
-              ? "scale-[1.15] sm:scale-125 -translate-y-[260px] z-50 shadow-2xl opacity-100 border-[#523E3E]"
-              : "-mt-7 z-10 hover:shadow-xl focus-within:shadow-xl focus-within:-translate-y-1"
+              ? "scale-[1.1] -translate-y-[280px] opacity-100" // Search bar jadi fokus utama pas transisi
+              : "-mt-7"
           }`}
         >
           <input

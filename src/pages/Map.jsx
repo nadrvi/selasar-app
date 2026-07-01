@@ -13,9 +13,11 @@ import {
   FaCrosshairs,
   FaTimes,
   FaRegSadTear,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { PiLeafFill } from "react-icons/pi";
 import locationsData from "../data/locationsData";
+import { useNavigate } from "react-router-dom";
 
 const getIcon = (category) => {
   switch (category) {
@@ -41,6 +43,7 @@ const filterCategories = [
 ];
 
 export default function Map() {
+  const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
 
@@ -57,12 +60,15 @@ export default function Map() {
   // Modal Escape Logic
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") setSelectedLocation(null);
+      if (e.key === "Escape") navigate(-1); // Balik ke halaman sebelumnya
     };
-    document.body.style.overflow = selectedLocation ? "hidden" : "unset";
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedLocation]);
+  }, [navigate]);
+
+  const handleBack = () => {
+    navigate(-1);
+  };
 
   useEffect(() => {
     let result = locationsData;
@@ -90,6 +96,12 @@ export default function Map() {
     <div
       className={`min-h-screen bg-[#F4EFE8] transition-opacity duration-1000 ${isLoaded ? "opacity-100" : "opacity-0"} pb-20`}
     >
+      <button
+        onClick={handleBack}
+        className="absolute top-6 left-6 z-50 p-3 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/20 hover:scale-110 active:scale-95 transition-all text-[#5E4B45]"
+      >
+        <FaArrowLeft size={20} />
+      </button>
       {/* HEADER */}
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex justify-center cursor-pointer transition-transform duration-500 hover:scale-105">
