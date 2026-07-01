@@ -15,87 +15,22 @@ import {
   FaRegSadTear,
 } from "react-icons/fa";
 import { PiLeafFill } from "react-icons/pi";
+import locationsData from "../data/locationsData";
 
-const locationsData = [
-  {
-    id: 1,
-    name: "Kopi Selasar",
-    distance: "250 m",
-    category: "Cafe",
-    icon: <FaCoffee className="text-white text-sm" />,
-    bgColor: "bg-[#7A5230]",
-    position: "top-20 left-12",
-    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24",
-    address: "Jl. Merdeka No. 10",
-    match: "95%",
-    specs: { plug: "Banyak", wifi: "Sangat Cepat", capacity: "1-2 orang" },
-  },
-  {
-    id: 2,
-    name: "CoWork Hub",
-    distance: "650 m",
-    category: "Coworking",
-    icon: <FaUsers className="text-white text-sm" />,
-    bgColor: "bg-[#7A5230]",
-    position: "top-32 right-32",
-    image: "https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2",
-    address: "Gd. Inovasi Lantai 3",
-    match: "88%",
-    specs: { plug: "Tersedia", wifi: "Cepat", capacity: "Tim (5-10)" },
-  },
-  {
-    id: 3,
-    name: "Perpus Kota",
-    distance: "1.2 km",
-    category: "Perpustakaan",
-    icon: <FaBook className="text-white text-sm" />,
-    bgColor: "bg-[#6B563D]",
-    position: "bottom-40 left-20",
-    image: "https://images.unsplash.com/photo-1568667256549-094345857637",
-    address: "Jl. Pustaka Raya No. 1",
-    match: "92%",
-    specs: { plug: "Terbatas", wifi: "Standar", capacity: "Individual" },
-  },
-  {
-    id: 4,
-    name: "Ruang Teduh",
-    distance: "400 m",
-    category: "Cafe",
-    icon: <FaCoffee className="text-white text-sm" />,
-    bgColor: "bg-[#7A5230]",
-    position: "bottom-44 right-24",
-    image: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf",
-    address: "Jl. Rindang No. 8",
-    match: "85%",
-    specs: { plug: "Lumayan", wifi: "Cepat", capacity: "2-4 orang" },
-  },
-  {
-    id: 5,
-    name: "Taman Literasi",
-    distance: "800 m",
-    category: "Alam",
-    icon: <FaTree className="text-white text-sm" />,
-    bgColor: "bg-[#556B2F]",
-    position: "bottom-20 left-[40%]",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-    address: "Taman Kota Blok C",
-    match: "80%",
-    specs: { plug: "Tidak Ada", wifi: "Publik (Lambat)", capacity: "Bebas" },
-  },
-  {
-    id: 6,
-    name: "Kreativ Space",
-    distance: "2.1 km",
-    category: "Coworking",
-    icon: <FaUsers className="text-white text-sm" />,
-    bgColor: "bg-[#7A5230]",
-    position: "top-[10%] left-[60%]",
-    image: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76",
-    address: "Jl. Industri Kreatif 99",
-    match: "82%",
-    specs: { plug: "Setiap Meja", wifi: "Sangat Cepat", capacity: "4-8 orang" },
-  },
-];
+const getIcon = (category) => {
+  switch (category) {
+    case "Cafe":
+      return <FaCoffee className="text-white text-sm" />;
+    case "Coworking":
+      return <FaUsers className="text-white text-sm" />;
+    case "Perpustakaan":
+      return <FaBook className="text-white text-sm" />;
+    case "Alam":
+      return <FaTree className="text-white text-sm" />;
+    default:
+      return null;
+  }
+};
 
 const filterCategories = [
   { label: "Semua", icon: null },
@@ -244,8 +179,9 @@ export default function Map() {
               <div
                 className={`w-10 h-10 rounded-full ${loc.bgColor} flex items-center justify-center mr-3 flex-shrink-0 shadow-inner`}
               >
-                {loc.icon}
+                {getIcon(loc.category)}
               </div>
+
               <div>
                 <h3 className="font-bold text-[#5E4B45] text-lg leading-5 transition-colors duration-300 hover:text-[#7A5230]">
                   {loc.name}
@@ -368,7 +304,7 @@ export default function Map() {
           onClick={() => setSelectedLocation(null)}
         >
           <div
-            className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full max-w-4xl animate-[scaleIn_0.3s_ease-out] relative"
+            className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full max-w-4xl animate-scale-in relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -448,18 +384,6 @@ export default function Map() {
           </div>
         </div>
       )}
-
-      {/* Global Style untuk Animasi */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        @keyframes scaleIn {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-      `,
-        }}
-      />
     </div>
   );
 }
