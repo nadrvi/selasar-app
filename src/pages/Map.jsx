@@ -54,6 +54,7 @@ export default function Map() {
 
   // Animasi awal render
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoaded(true);
   }, []);
 
@@ -89,9 +90,9 @@ export default function Map() {
       );
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilteredLocations(result);
-  }, [searchQuery, activeFilter]); // Akan jalan tiap kali user ngetik atau klik filter
-
+  }, [searchQuery, activeFilter]); 
   return (
     <div
       className={`min-h-screen bg-[#F4EFE8] transition-opacity duration-1000 ${isLoaded ? "opacity-100" : "opacity-0"} pb-20`}

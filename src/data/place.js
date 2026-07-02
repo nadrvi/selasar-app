@@ -2,6 +2,7 @@ export const placesData = [
   {
     id: 1,
     name: "Kopi Nalar",
+    city: "Jakarta",
     image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=600&q=80",
     noiseLevel: "Tenang",
     wifiStatus: "Bagus",
@@ -9,10 +10,13 @@ export const placesData = [
     visitors: 12,
     mood: "Fokus",
     overthinkingStatus: "Aman buat fokus",
+    description:
+      "Suasana kalem dengan meja-meja yang berjarak pas, colokan gampang dicari di hampir tiap sudut. Pilihan solid buat kamu yang butuh fokus tanpa banyak gangguan.",
   },
   {
     id: 2,
     name: "Titik Koma Coffee",
+    city: "Bandung",
     image: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=600&q=80",
     noiseLevel: "Lumayan ramai",
     wifiStatus: "Sedang",
@@ -20,10 +24,13 @@ export const placesData = [
     visitors: 32,
     mood: "Santai",
     overthinkingStatus: "Tidak cocok buat overthinking",
+    description:
+      "Rame, hidup, dan penuh obrolan — enak buat nongkrong bareng temen, tapi kurang pas kalau kamu butuh konsentrasi tinggi. Colokan agak rebutan pas jam ramai.",
   },
   {
     id: 3,
     name: "Ruang Seduh",
+    city: "Jakarta",
     image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=600&q=80",
     noiseLevel: "Sunyi",
     wifiStatus: "Sangat Bagus",
@@ -31,10 +38,13 @@ export const placesData = [
     visitors: 5,
     mood: "Deadline mode",
     overthinkingStatus: "Aman buat fokus",
+    description:
+      "Spot paling sepi di daftar ini, WiFi kenceng stabil, dan colokan hampir selalu tersedia. Juara buat begadang ngejar deadline atau nyusun skripsi.",
   },
   {
     id: 4,
     name: "Bilik Kopi",
+    city: "Bogor",
     image: "https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?auto=format&fit=crop&w=600&q=80",
     noiseLevel: "Ramai",
     wifiStatus: "Bagus",
@@ -42,5 +52,35 @@ export const placesData = [
     visitors: 45,
     mood: "Healing",
     overthinkingStatus: "Banyak distraksi",
-  }
+    description:
+      "Selalu penuh dan rame pengunjung, vibe-nya asik buat healing atau ngobrol santai. Bukan tempat yang tepat kalau kamu ngincer colokan atau ketenangan.",
+  },
+  {
+    id: 5,
+    name: "Kisah Manis",
+    city: "Bandung",
+    image: "https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=600&q=80",
+    noiseLevel: "Sedang",
+    wifiStatus: "Bagus",
+    colokanProbability: "70%",
+    visitors: 18,
+    mood: "Santai",
+    overthinkingStatus: "Cocok buat nongkrong",
+    description:
+      "Suasana pas di tengah — nggak terlalu sepi, nggak terlalu berisik. Colokan cukup gampang dicari, cocok buat nugas santai sambil nongkrong bareng temen.",
+  },
+  {
+    id: 6,
+    name: "Kopi Daong",
+    city: "Bogor",
+    image: "https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=600&q=80",
+    noiseLevel: "Ramai",
+    wifiStatus: "Lumayan",
+    colokanProbability: "30%",
+    visitors: 60,
+    mood: "Healing",
+    overthinkingStatus: "Cocok cari angin",
+    description:
+      "View hutan pinus yang bikin fresh, tapi selalu penuh pengunjung dan colokan terbatas. Lebih pas buat healing sambil ngopi daripada ngerjain tugas berat.",
+  },
 ];
