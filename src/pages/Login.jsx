@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import logoSelasar from "../assets/logo.png";
+import logoSelasar from "../assets/Logo.png";
 import Daun from "../assets/Daun.png";
 import DaunBawah from "../assets/Daun_half.png";
 

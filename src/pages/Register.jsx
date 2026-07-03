@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Daun from "../assets/daun.png";
+import Daun from "../assets/Daun.png";
 import TextSelasar from "../assets/text-logo2.png";
 
 export default function Register() {
