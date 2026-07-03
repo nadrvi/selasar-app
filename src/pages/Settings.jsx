@@ -835,11 +835,8 @@ export default function Settings() {
         theme={theme}
       >
         <div className="flex flex-col items-center text-center gap-3">
-          <div className="logo-pop w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8B6B4F] to-[#594A42] flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-            S
-          </div>
+            <img src="./src/assets/Logo.png" alt="Selasar Logo" className="size-30 logo-pop"/>
           <div>
-            <p className={`font-bold text-lg ${theme.textPrimary}`}>Selasar</p>
             <p className={`text-xs ${theme.textSecondary}`}>Versi 1.0.0</p>
           </div>
           <p
@@ -871,7 +868,7 @@ export default function Settings() {
           >
             Dibuat dengan{" "}
             <FaHeart className="heart-beat text-red-400" size={10} /> di
-            Indonesia
+            Indonesia oleh tim Selasar
           </p>
         </div>
       </BottomSheet>

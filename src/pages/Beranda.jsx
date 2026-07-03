@@ -89,6 +89,16 @@ const searchHints = [
   "Pengen suasana yang tenang?",
 ];
 
+const headingTexts = [
+  "Temukan Sudut Nugas yang Pas Buat Kamu",
+  "Nugas Enak, Gak Perlu Ribet Cari Tempat",
+  "Spot Favorit Buat Kejar Deadline",
+  "Colokan Aman, WiFi Kenceng, Fokus Lancar",
+  "Cari Tempat Nugas yang Cozy dan Tenang",
+  "Nugas Sambil Ngopi, Kenapa Nggak?",
+  "Tempat Nugas yang Bikin Kamu Betah Berlama-lama",
+];
+
 function RevealOnScroll({ children, delay = 0 }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -142,6 +152,13 @@ export default function Beranda() {
 
   const [greeting, setGreeting] = useState("Halo,");
   const [hintIndex, setHintIndex] = useState(0);
+  const [headingIndex, setHeadingIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeadingIndex((i) => (i + 1) % headingTexts.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -370,8 +387,11 @@ export default function Beranda() {
             <p className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold uppercase tracking-[0.2em] mb-2">
               {greeting}
             </p>
-            <h1 className="text-2xl md:text-[1.75rem] font-bold text-[#594A42] dark:text-[#F5F2EB] leading-snug">
-              Temukan Sudut Nugas yang Pas Buat Kamu
+            <h1
+              key={headingIndex}
+              className="text-2xl md:text-[1.75rem] font-bold text-[#594A42] dark:text-[#F5F2EB] leading-snug animate-fade-in-hint min-h-[2.5rem] md:min-h-[3.5rem]"
+            >
+              {headingTexts[headingIndex]}
             </h1>
           </div>
 
