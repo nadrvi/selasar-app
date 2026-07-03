@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import logoSelasar from "../assets/Logo.png";
 import { useTheme } from "../context/ThemeContext";
 import {
   FaArrowLeft,
@@ -835,7 +836,7 @@ export default function Settings() {
         theme={theme}
       >
         <div className="flex flex-col items-center text-center gap-3">
-            <img src="./src/assets/Logo.png" alt="Selasar Logo" className="size-30 logo-pop"/>
+            <img src={logoSelasar} alt="Selasar Logo" className="size-30 logo-pop"/>
           <div>
             <p className={`text-xs ${theme.textSecondary}`}>Versi 1.0.0</p>
           </div>
