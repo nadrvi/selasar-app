@@ -3,17 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import textLogo from "../assets/text-logo.png";
 import { placesData } from "../data/place";
 import {
+  logVisit,
+  toggleFavorite as toggleFavoriteStore,
+  getFavorites as getStoredFavorites,
+} from "../utils/activityStore";
+import {
   FaTimes,
-  FaMapMarkerAlt,
   FaPlug,
   FaWifi,
   FaUsers,
   FaBookmark,
   FaLocationArrow,
   FaTag,
+  FaCog,
+  FaFilter,
 } from "react-icons/fa";
 
-// 1. Data Iklan (6 Item Sesuai Request)
 const banners = [
   {
     id: 1,
@@ -77,9 +82,6 @@ const banners = [
   },
 ];
 
-// Hint pencarian yang bergantian pelan-pelan di search bar.
-// Item pertama SENGAJA sama persis dengan placeholder original,
-// jadi tampilan awal (first paint) nggak berubah sama sekali.
 const searchHints = [
   "Mau nugas di mana hari ini?",
   "Nyari colokan yang gampang?",
@@ -87,8 +89,6 @@ const searchHints = [
   "Pengen suasana yang tenang?",
 ];
 
-// Komponen kecil buat scroll-reveal card, biar grid nggak muncul kaku
-// sekaligus, tapi nyusul satu-satu pas di-scroll. Nggak nambah dependency.
 function RevealOnScroll({ children, delay = 0 }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -113,7 +113,7 @@ function RevealOnScroll({ children, delay = 0 }) {
     <div
       ref={ref}
       style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-700 ease-smooth ${
+      className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       }`}
     >
@@ -129,35 +129,33 @@ export default function Beranda() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("Show Everything");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState(null);
-  const [selectedBanner, setSelectedBanner] = useState(null); // State Modal Iklan
+  const [selectedBanner, setSelectedBanner] = useState(null);
 
-  // Ref & State untuk Logic Carousel (Drag & Auto-scroll)
   const carouselRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [dragDistance, setDragDistance] = useState(0);
-  const [activeSlide, setActiveSlide] = useState(0); // dot indicator carousel
+  const [activeSlide, setActiveSlide] = useState(0);
 
-  // Sapaan dinamis sesuai jam
   const [greeting, setGreeting] = useState("Halo,");
-
-  // Hint placeholder search bar yang gonta-ganti pelan
   const [hintIndex, setHintIndex] = useState(0);
 
-  // Fitur Favorit / Bookmark tempat
   const [favorites, setFavorites] = useState(() => {
     try {
-      const saved = localStorage.getItem("selasar_favorites");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
+      return new Set(
+        getStoredFavorites()
+          .filter((f) => f.source === "beranda")
+          .map((f) => f.id),
+      );
     } catch {
       return new Set();
     }
   });
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  // Animasi Masuk & Keluar Halaman
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 50);
     return () => clearTimeout(timer);
@@ -170,16 +168,15 @@ export default function Beranda() {
     }
   }, [destination, navigate]);
 
-  // Sapaan berdasarkan jam saat halaman dibuka
   useEffect(() => {
     const hour = new Date().getHours();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (hour < 10) setGreeting("Pagi yang cerah,");
     else if (hour < 15) setGreeting("Siang ini,");
     else if (hour < 18) setGreeting("Sore ini,");
     else setGreeting("Malam ini,");
   }, []);
 
-  // Rotasi hint di search bar tiap 3 detik
   useEffect(() => {
     const timer = setInterval(() => {
       setHintIndex((i) => (i + 1) % searchHints.length);
@@ -187,19 +184,6 @@ export default function Beranda() {
     return () => clearInterval(timer);
   }, []);
 
-  // Simpan favorit ke localStorage tiap berubah
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "selasar_favorites",
-        JSON.stringify(Array.from(favorites)),
-      );
-    } catch {
-      // storage nggak tersedia, aman diabaikan
-    }
-  }, [favorites]);
-
-  // Handle Modal Escape
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
@@ -213,12 +197,10 @@ export default function Beranda() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedPlace, selectedBanner]);
 
-  // Handle Auto-Slide Carousel
   useEffect(() => {
     const interval = setInterval(() => {
       if (carouselRef.current && !isDragging) {
         const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
-        // Kalau udah nyampe mentok kanan, balik ke 0. Kalau belum, geser ke kanan.
         if (scrollLeft + clientWidth >= scrollWidth - 10) {
           carouselRef.current.scrollTo({ left: 0, behavior: "smooth" });
         } else {
@@ -228,11 +210,10 @@ export default function Beranda() {
           });
         }
       }
-    }, 4000); // Otomatis geser tiap 4 detik
+    }, 4000);
     return () => clearInterval(interval);
   }, [isDragging]);
 
-  // Fungsi Drag Carousel
   const onDragStart = (e) => {
     setIsDragging(true);
     setDragDistance(0);
@@ -248,12 +229,11 @@ export default function Beranda() {
     if (!isDragging) return;
     e.preventDefault();
     const x = e.pageX || e.touches[0].pageX - carouselRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Kecepatan geser
+    const walk = (x - startX) * 1.5;
     setDragDistance(Math.abs(walk));
     carouselRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  // Nentuin dot aktif berdasarkan posisi scroll carousel
   const handleCarouselScroll = () => {
     if (!carouselRef.current) return;
     const { scrollLeft, scrollWidth } = carouselRef.current;
@@ -272,20 +252,39 @@ export default function Beranda() {
   };
 
   const handleBannerClick = (banner) => {
-    // Cuma buka modal kalau user niatnya NGE-KLIK (bukan NGE-DRAG)
     if (dragDistance < 10) {
       setSelectedBanner(banner);
     }
   };
 
   const toggleFavorite = (e, placeId) => {
-    e.stopPropagation(); // biar nggak ikut buka modal detail lokasi
+    e.stopPropagation();
+    const place = placesData.find((p) => p.id === placeId);
+    toggleFavoriteStore({
+      source: "beranda",
+      id: placeId,
+      name: place?.name,
+      image: place?.image,
+      match: place?.match,
+    });
     setFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(placeId)) next.delete(placeId);
       else next.add(placeId);
       return next;
     });
+  };
+
+  const handleSelectPlace = (place) => {
+    logVisit({
+      source: "beranda",
+      id: place.id,
+      name: place.name,
+      image: place.image,
+      subtitle: place.city,
+      match: place.match,
+    });
+    setSelectedPlace(place);
   };
 
   const handleNavigate = (path) => setDestination(path);
@@ -304,9 +303,10 @@ export default function Beranda() {
 
   return (
     <div
-      className={`relative min-h-screen bg-[#EBE7DF] pb-12 select-none font-sans overflow-x-hidden transition-opacity duration-700 ease-out ${isLoaded ? "opacity-100" : "opacity-0"}`}
+      className={`relative min-h-screen bg-[#EBE7DF] dark:bg-[#1F1B18] pb-12 select-none font-sans overflow-x-hidden transition-colors duration-500 ${
+        isLoaded ? "opacity-100" : "opacity-0"
+      } transition-opacity duration-700 ease-out`}
     >
-      {/* Style tambahan: animasi blob & hint, self-contained, nggak nyentuh globals.css */}
       <style>{`
         @keyframes blobFloat {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -329,17 +329,17 @@ export default function Beranda() {
         }
       `}</style>
 
-      {/* Blob dekoratif di background, bikin halaman nggak terasa flat/kaku */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-28 -left-20 w-96 h-96 bg-[#D9B382]/20 rounded-full blur-3xl animate-blob-float" />
-        <div className="absolute top-1/4 -right-24 w-[26rem] h-[26rem] bg-[#594A42]/10 rounded-full blur-3xl animate-blob-float-slow" />
-        <div className="absolute bottom-10 left-1/4 w-72 h-72 bg-[#8B6B4F]/10 rounded-full blur-3xl animate-blob-float" />
+        <div className="absolute -top-28 -left-20 w-96 h-96 bg-[#D9B382]/20 dark:bg-[#D9B382]/10 rounded-full blur-3xl animate-blob-float" />
+        <div className="absolute top-1/4 -right-24 w-[26rem] h-[26rem] bg-[#594A42]/10 dark:bg-[#594A42]/20 rounded-full blur-3xl animate-blob-float-slow" />
+        <div className="absolute bottom-10 left-1/4 w-72 h-72 bg-[#8B6B4F]/10 dark:bg-[#8B6B4F]/15 rounded-full blur-3xl animate-blob-float" />
       </div>
 
       <div className="relative z-10">
-        {/* Header / Navbar */}
         <nav
-          className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-700 ease-smooth ${isTransitioning ? "opacity-0 -translate-y-8" : "opacity-100"}`}
+          className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            isTransitioning ? "opacity-0 -translate-y-8" : "opacity-100"
+          }`}
         >
           <div className="w-[76px]"></div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer transition-transform duration-300 hover:scale-105">
@@ -349,42 +349,35 @@ export default function Beranda() {
               className="h-16 w-auto object-contain"
             />
           </div>
-          <Link to="/profile" className="outline-none group">
+          <Link to="/settings" className="outline-none group">
             <div className="w-[76px] h-[34px] bg-[#594A42] rounded-full p-1 relative flex items-center justify-end shadow-inner transition-all duration-300 ease-out group-hover:bg-[#433731]">
               <div className="w-[26px] h-[26px] bg-[#EBE7DF] rounded-full flex items-center justify-center shadow-md text-[#594A42] transition-all duration-300 ease-out group-hover:bg-white group-hover:scale-110">
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <FaCog
+                  size={14}
+                  className="animate-[spin_6s_linear_infinite] group-hover:animate-none"
+                />
               </div>
             </div>
           </Link>
         </nav>
 
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex flex-col items-center">
-          {/* Sapaan singkat, kasih kesan "hidup" di awal halaman */}
           <div
-            className={`text-center mb-6 transition-all duration-700 ease-smooth ${isTransitioning ? "opacity-0 -translate-y-4" : "opacity-100"}`}
+            className={`text-center mb-6 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              isTransitioning ? "opacity-0 -translate-y-4" : "opacity-100"
+            }`}
           >
-            <p className="text-[#8B6B4F] text-xs font-bold uppercase tracking-[0.2em] mb-2">
+            <p className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold uppercase tracking-[0.2em] mb-2">
               {greeting}
             </p>
-            <h1 className="text-2xl md:text-[1.75rem] font-bold text-[#594A42] leading-snug">
+            <h1 className="text-2xl md:text-[1.75rem] font-bold text-[#594A42] dark:text-[#F5F2EB] leading-snug">
               Temukan Sudut Nugas yang Pas Buat Kamu
             </h1>
           </div>
 
-          {/* Kontainer Peta */}
           <div
             onClick={() => handleNavigate("/map")}
-            className={`w-full h-[280px] cursor-pointer relative group overflow-hidden rounded-[2.5rem] border border-gray-200 shadow-md transition-all duration-700 ease-smooth ${
+            className={`w-full h-[280px] cursor-pointer relative group overflow-hidden rounded-[2.5rem] border border-gray-200 dark:border-[#3D342D] shadow-md transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
               isTransitioning
                 ? "opacity-0 scale-[0.98] blur-sm"
                 : "opacity-100 scale-100"
@@ -393,28 +386,29 @@ export default function Beranda() {
             <iframe
               title="Map Area"
               src="https://www.openstreetmap.org/export/embed.html?bbox=106.75%2C-6.25%2C106.85%2C-6.15&layer=mapnik"
-              className="w-full h-full border-0 grayscale-[70%] contrast-[1.1] brightness-[0.9] transition-all duration-500 group-hover:grayscale-0 group-hover:brightness-100"
+              className="w-full h-full border-0 grayscale-[70%] contrast-[1.1] brightness-[0.9] dark:brightness-[0.6] transition-all duration-500 group-hover:grayscale-0 group-hover:brightness-100"
               style={{ pointerEvents: "none" }}
             ></iframe>
 
-            <div className="absolute top-6 left-6 flex items-center gap-2 bg-[#EBE7DF]/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/50 shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-[#594A42] animate-pulse"></div>
-              <span className="text-[#594A42] text-xs font-bold uppercase tracking-widest">
+            <div className="absolute top-6 left-6 flex items-center gap-2 bg-[#EBE7DF]/80 dark:bg-[#2A2521]/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/50 dark:border-[#3D342D] shadow-sm">
+              <div className="w-2 h-2 rounded-full bg-[#594A42] dark:bg-[#C4A876] animate-pulse"></div>
+              <span className="text-[#594A42] dark:text-[#F5F2EB] text-xs font-bold uppercase tracking-widest">
                 Eksplor Peta
               </span>
             </div>
 
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
               <div className="relative">
-                <div className="w-4 h-4 bg-[#594A42] rounded-full border-2 border-white shadow-lg animate-pulse"></div>
-                <div className="absolute -inset-2 bg-[#594A42]/20 rounded-full animate-ping"></div>
+                <div className="w-4 h-4 bg-[#594A42] dark:bg-[#C4A876] rounded-full border-2 border-white dark:border-[#2A2521] shadow-lg animate-pulse"></div>
+                <div className="absolute -inset-2 bg-[#594A42]/20 dark:bg-[#C4A876]/20 rounded-full animate-ping"></div>
               </div>
             </div>
           </div>
 
-          {/* CAROUSEL IKLAN */}
           <div
-            className={`w-full mt-8 mb-2 transition-all duration-700 ease-smooth delay-75 ${isTransitioning ? "opacity-0 translate-y-4" : "opacity-100"}`}
+            className={`w-full mt-8 mb-2 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] delay-75 ${
+              isTransitioning ? "opacity-0 translate-y-4" : "opacity-100"
+            }`}
           >
             <div
               ref={carouselRef}
@@ -457,7 +451,6 @@ export default function Beranda() {
               ))}
             </div>
 
-            {/* Dot indicator carousel */}
             <div className="flex justify-center gap-2 mb-6">
               {banners.map((_, i) => (
                 <button
@@ -466,34 +459,33 @@ export default function Beranda() {
                   aria-label={`Ke promo ${i + 1}`}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
                     activeSlide === i
-                      ? "w-6 bg-[#594A42]"
-                      : "w-1.5 bg-[#594A42]/30 hover:bg-[#594A42]/50"
+                      ? "w-6 bg-[#594A42] dark:bg-[#C4A876]"
+                      : "w-1.5 bg-[#594A42]/30 dark:bg-[#C4A876]/30 hover:bg-[#594A42]/50 dark:hover:bg-[#C4A876]/50"
                   }`}
                 />
               ))}
             </div>
           </div>
 
-          {/* Search Bar */}
           <div
             onClick={() => handleNavigate("/searching")}
-            className={`flex w-full max-w-[480px] relative shadow-lg rounded-full bg-[#fdfcfa] border border-gray-300 h-14 cursor-text transition-all duration-700 ease-smooth ${
+            className={`flex w-full max-w-[480px] relative shadow-lg rounded-full bg-[#fdfcfa] dark:bg-[#2A2521] border border-gray-300 dark:border-[#3D342D] h-14 cursor-text transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
               isTransitioning
-                ? "scale-[1.1] -translate-y-[300px] opacity-100 z-50 border-[#594A42]"
+                ? "scale-[1.1] -translate-y-[300px] opacity-100 z-50 border-[#594A42] dark:border-[#C4A876]"
                 : "hover:shadow-xl hover:-translate-y-1 z-10"
             }`}
           >
             <div className="flex-1 relative flex items-center px-6 overflow-hidden rounded-l-full cursor-pointer">
               <span
                 key={hintIndex}
-                className="text-sm text-gray-400 font-medium animate-fade-in-hint whitespace-nowrap"
+                className="text-sm text-gray-400 dark:text-gray-500 font-medium animate-fade-in-hint whitespace-nowrap"
               >
                 {searchHints[hintIndex]}
               </span>
             </div>
-            <button className="w-16 bg-[#E5DFCF] border-l border-gray-300 rounded-r-full flex items-center justify-center hover:bg-[#d5cebd] transition-colors active:bg-[#c4bcab]">
+            <button className="w-16 bg-[#E5DFCF] dark:bg-[#3D342D] border-l border-gray-300 dark:border-[#3D342D] rounded-r-full flex items-center justify-center hover:bg-[#d5cebd] dark:hover:bg-[#453a32] transition-colors active:bg-[#c4bcab] dark:active:bg-[#332C27]">
               <svg
-                className="w-5 h-5 text-gray-700"
+                className="w-5 h-5 text-gray-700 dark:text-gray-200"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -508,58 +500,93 @@ export default function Beranda() {
             </button>
           </div>
 
-          {/* Tombol Filter */}
+          {/* MENU FILTER EXPANDABLE */}
           <div
-            className={`flex flex-wrap justify-center items-center gap-4 mt-10 mb-6 transition-all duration-500 ease-in-out delay-150 ${isTransitioning ? "opacity-0 translate-y-10" : "opacity-100 translate-y-0"}`}
+            className={`flex justify-center items-center mt-10 mb-6 transition-all duration-500 ease-in-out delay-150 ${
+              isTransitioning
+                ? "opacity-0 translate-y-10"
+                : "opacity-100 translate-y-0"
+            }`}
           >
-            <button
-              onClick={() => setActiveFilter("Show Everything")}
-              className={`px-8 py-2.5 rounded-full font-semibold text-sm shadow-sm transition-all duration-300 active:scale-95 ${
-                activeFilter === "Show Everything"
-                  ? "bg-[#594A42] text-white shadow-md scale-105"
-                  : "bg-[#fdfcfa] text-[#594A42] border border-gray-300 hover:bg-[#F5F2EB]"
-              }`}
-            >
-              Show Everything
-            </button>
-
-            {["Jakarta", "Bogor", "Bandung"].map((city) => (
+            <div className="flex items-center bg-[#fdfcfa] dark:bg-[#2A2521] rounded-full shadow-md border border-gray-200 dark:border-[#3D342D] p-1.5 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] hover:shadow-lg">
               <button
-                key={city}
-                onClick={() => setActiveFilter(city)}
-                className={`px-10 py-2.5 rounded-full font-semibold text-sm shadow-sm transition-all duration-300 active:scale-95 border ${
-                  activeFilter === city
-                    ? "bg-[#594A42] text-white border-transparent shadow-md scale-105"
-                    : "bg-[#fdfcfa] text-[#594A42] border-gray-300 hover:bg-[#F5F2EB] hover:border-[#594A42]"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`shrink-0 flex items-center justify-center gap-2 h-11 px-6 rounded-full font-bold text-sm shadow-sm transition-all duration-300 active:scale-95 z-10 ${
+                  isFilterOpen
+                    ? "bg-[#EFE7E2] dark:bg-[#3D342D] text-[#594A42] dark:text-[#F5F2EB] hover:bg-[#EBE7DF] dark:hover:bg-[#453a32]"
+                    : "bg-[#594A42] text-white hover:bg-[#433731]"
                 }`}
               >
-                {city}
+                {isFilterOpen ? <FaTimes size={12} /> : <FaFilter size={12} />}
+                <span className="w-[38px] text-left">
+                  {isFilterOpen ? "Tutup" : "Filter"}
+                </span>
               </button>
-            ))}
 
-            {/* Pemisah + chip Favorit, kategori terpisah dari filter kota */}
-            <div className="w-px h-8 bg-gray-300/80 mx-1 hidden sm:block" />
+              <div
+                className={`grid transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  isFilterOpen
+                    ? "grid-cols-[1fr] opacity-100 ml-2"
+                    : "grid-cols-[0fr] opacity-0 ml-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2 w-max pr-1">
+                    <button
+                      onClick={() => setActiveFilter("Show Everything")}
+                      className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 active:scale-95 ${
+                        activeFilter === "Show Everything"
+                          ? "bg-[#594A42] text-white shadow-md"
+                          : "bg-transparent text-[#594A42] dark:text-[#C4A876] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27]"
+                      }`}
+                    >
+                      Show Everything
+                    </button>
 
-            <button
-              onClick={() => setShowFavoritesOnly((v) => !v)}
-              className={`px-6 py-2.5 rounded-full font-semibold text-sm shadow-sm transition-all duration-300 active:scale-95 border flex items-center gap-2 ${
-                showFavoritesOnly
-                  ? "bg-[#8B6B4F] text-white border-transparent shadow-md scale-105"
-                  : "bg-[#fdfcfa] text-[#8B6B4F] border-gray-300 hover:bg-[#F5F2EB] hover:border-[#8B6B4F]"
-              }`}
-            >
-              <FaBookmark size={12} />
-              Favorit{favorites.size > 0 ? ` (${favorites.size})` : ""}
-            </button>
+                    {["Jakarta", "Bogor", "Bandung"].map((city) => (
+                      <button
+                        key={city}
+                        onClick={() => setActiveFilter(city)}
+                        className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 active:scale-95 border ${
+                          activeFilter === city
+                            ? "bg-[#594A42] text-white border-transparent shadow-md"
+                            : "bg-transparent text-[#594A42] dark:text-[#C4A876] border-gray-300 dark:border-[#3D342D] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27] hover:border-[#594A42] dark:hover:border-[#C4A876]"
+                        }`}
+                      >
+                        {city}
+                      </button>
+                    ))}
+
+                    <div className="w-px h-6 bg-gray-300 dark:bg-[#3D342D] mx-1 shrink-0" />
+
+                    <button
+                      onClick={() => setShowFavoritesOnly((v) => !v)}
+                      className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 active:scale-95 border flex items-center gap-2 ${
+                        showFavoritesOnly
+                          ? "bg-[#8B6B4F] text-white border-transparent shadow-md"
+                          : "bg-transparent text-[#8B6B4F] dark:text-[#C4A876] border-gray-300 dark:border-[#3D342D] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27] hover:border-[#8B6B4F] dark:hover:border-[#C4A876]"
+                      }`}
+                    >
+                      <FaBookmark size={12} />
+                      Favorit{favorites.size > 0 ? ` (${favorites.size})` : ""}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
 
-        {/* GRID DAFTAR TEMPAT (Cards) */}
+        {/* GRID DAFTAR TEMPAT */}
         <div
-          className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-500 ease-in-out delay-200 ${isTransitioning ? "opacity-0 translate-y-12" : "opacity-100 translate-y-0"}`}
+          className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-500 ease-in-out delay-200 ${
+            isTransitioning
+              ? "opacity-0 translate-y-12"
+              : "opacity-100 translate-y-0"
+          }`}
         >
           {filteredPlaces.length > 0 && (
-            <p className="text-sm text-[#8B6B4F] font-medium mb-4">
+            <p className="text-sm text-[#8B6B4F] dark:text-[#C4A876] font-medium mb-4">
               Menampilkan {filteredPlaces.length} tempat
               {activeFilter !== "Show Everything" ? ` di ${activeFilter}` : ""}
               {showFavoritesOnly ? " yang kamu favoritkan" : ""}
@@ -571,8 +598,8 @@ export default function Beranda() {
               {filteredPlaces.map((place, index) => (
                 <RevealOnScroll key={place.id} delay={(index % 3) * 100}>
                   <div
-                    onClick={() => setSelectedPlace(place)} // TRIGGER POP-UP LOKASI
-                    className="bg-white rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden border border-gray-100 flex flex-col cursor-pointer group"
+                    onClick={() => handleSelectPlace(place)}
+                    className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden border border-gray-100 dark:border-[#3D342D] flex flex-col cursor-pointer group"
                   >
                     <div className="h-48 overflow-hidden relative">
                       <img
@@ -580,11 +607,10 @@ export default function Beranda() {
                         alt={place.name}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
-                      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-[#594A42] shadow-sm uppercase tracking-wider">
+                      <div className="absolute top-4 left-4 bg-white/90 dark:bg-[#2A2521]/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-[#594A42] dark:text-[#F5F2EB] shadow-sm uppercase tracking-wider">
                         {place.city}
                       </div>
 
-                      {/* Tombol Favorit, ditempatkan di pojok kanan atas kartu (pola umum "save") */}
                       <button
                         onClick={(e) => toggleFavorite(e, place.id)}
                         aria-label={
@@ -595,32 +621,32 @@ export default function Beranda() {
                         className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center shadow-sm backdrop-blur-sm transition-all duration-300 active:scale-90 ${
                           favorites.has(place.id)
                             ? "bg-[#8B6B4F] text-white"
-                            : "bg-white/90 text-gray-400 hover:text-[#8B6B4F]"
+                            : "bg-white/90 dark:bg-[#2A2521]/90 text-gray-400 dark:text-gray-400 hover:text-[#8B6B4F] dark:hover:text-[#C4A876]"
                         }`}
                       >
                         <FaBookmark size={13} />
                       </button>
 
-                      <div className="absolute top-14 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-green-800 flex items-center gap-1 shadow-sm">
+                      <div className="absolute top-14 right-4 bg-white/90 dark:bg-[#2A2521]/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-green-800 dark:text-green-400 flex items-center gap-1 shadow-sm">
                         🔌 {place.colokanProbability}
                       </div>
                     </div>
                     <div className="p-6 flex flex-col flex-1">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h3 className="text-xl font-bold text-gray-800 group-hover:text-[#594A42] transition-colors">
+                          <h3 className="text-xl font-bold text-gray-800 dark:text-[#F5F2EB] group-hover:text-[#594A42] dark:group-hover:text-[#C4A876] transition-colors">
                             {place.name}
                           </h3>
-                          <p className="text-sm text-green-700 font-medium mt-0.5">
+                          <p className="text-sm text-green-700 dark:text-green-400 font-medium mt-0.5">
                             {place.overthinkingStatus}
                           </p>
                         </div>
-                        <span className="bg-[#EBE7DF] text-[#594A42] text-xs px-2.5 py-1.5 rounded-lg font-bold shadow-sm whitespace-nowrap">
+                        <span className="bg-[#EBE7DF] dark:bg-[#1F1B18] text-[#594A42] dark:text-[#C4A876] text-xs px-2.5 py-1.5 rounded-lg font-bold shadow-sm whitespace-nowrap">
                           {place.mood}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-gray-600 mt-auto bg-gray-50 p-4 rounded-2xl group-hover:bg-[#F5F2EB] transition-colors">
+                      <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-gray-600 dark:text-gray-300 mt-auto bg-gray-50 dark:bg-[#1F1B18] p-4 rounded-2xl group-hover:bg-[#F5F2EB] dark:group-hover:bg-[#332C27] transition-colors">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🔊</span>{" "}
                           <span className="font-medium">
@@ -633,7 +659,7 @@ export default function Beranda() {
                             {place.wifiStatus}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 col-span-2 border-t border-gray-200 pt-2 mt-1">
+                        <div className="flex items-center gap-2 col-span-2 border-t border-gray-200 dark:border-[#3D342D] pt-2 mt-1">
                           <span className="text-lg">👥</span>{" "}
                           <span className="font-medium">
                             {place.visitors} Orang lagi nugas
@@ -646,16 +672,16 @@ export default function Beranda() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-16 px-6 bg-white/40 rounded-3xl border-2 border-dashed border-[#D5D0C5]">
+            <div className="flex flex-col items-center justify-center py-16 px-6 bg-white/40 dark:bg-[#2A2521]/40 rounded-3xl border-2 border-dashed border-[#D5D0C5] dark:border-[#3D342D]">
               <div className="text-5xl mb-4">
                 {showFavoritesOnly ? "🔖" : "🔍"}
               </div>
-              <h3 className="text-lg font-bold text-[#594A42] mb-2 text-center">
+              <h3 className="text-lg font-bold text-[#594A42] dark:text-[#F5F2EB] mb-2 text-center">
                 {showFavoritesOnly
                   ? "Belum ada tempat favorit"
                   : "Belum ada tempat yang cocok"}
               </h3>
-              <p className="text-sm text-gray-500 mb-6 text-center max-w-xs">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center max-w-xs">
                 {showFavoritesOnly
                   ? "Tap ikon bookmark di kartu tempat buat nyimpen spot andalan kamu."
                   : "Coba ubah filter kota, atau lihat semua tempat yang tersedia."}
@@ -671,21 +697,18 @@ export default function Beranda() {
         </div>
       </div>
 
-      {/* ========================================= */}
-      {/* 1. MODAL POP-UP LOKASI */}
-      {/* ========================================= */}
       {selectedPlace && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#445234]/40 backdrop-blur-sm transition-opacity duration-300 px-4"
           onClick={() => setSelectedPlace(null)}
         >
           <div
-            className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full max-w-4xl animate-scale-in relative"
+            className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full max-w-4xl animate-scale-in relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setSelectedPlace(null)}
-              className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center text-gray-600 hover:bg-[#EFE7E2] hover:text-[#8B6B4F] hover:rotate-90 transition-all duration-300 shadow-sm"
+              className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/80 dark:bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-[#EFE7E2] dark:hover:bg-[#3D342D] hover:text-[#8B6B4F] dark:hover:text-[#C4A876] hover:rotate-90 transition-all duration-300 shadow-sm"
             >
               <FaTimes size={18} />
             </button>
@@ -699,44 +722,47 @@ export default function Beranda() {
             <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
               <div>
                 <div className="flex items-start justify-between gap-3 mb-1">
-                  <h2 className="text-3xl font-bold text-[#5E4B45]">
+                  <h2 className="text-3xl font-bold text-[#5E4B45] dark:text-[#F5F2EB]">
                     {selectedPlace.name}
                   </h2>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-green-700 font-medium mb-4">
+                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 font-medium mb-4">
                   {selectedPlace.overthinkingStatus}
                 </div>
 
                 {selectedPlace.description && (
-                  <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
                     {selectedPlace.description}
                   </p>
                 )}
 
-                <div className="grid grid-cols-2 gap-4 md:gap-5 mt-4 text-sm text-[#5E4B45]">
-                  <div className="bg-[#F4EFE8] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500">
-                      <FaPlug className="text-[#8B6B4F]" /> Colokan
+                <div className="grid grid-cols-2 gap-4 md:gap-5 mt-4 text-sm text-[#5E4B45] dark:text-[#F5F2EB]">
+                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
+                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
+                      <FaPlug className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
+                      Colokan
                     </p>
                     <p className="font-semibold">
                       {selectedPlace.colokanProbability}
                     </p>
                   </div>
-                  <div className="bg-[#F4EFE8] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500">
-                      <FaWifi className="text-[#8B6B4F]" /> WiFi
+                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
+                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
+                      <FaWifi className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
+                      WiFi
                     </p>
                     <p className="font-semibold">{selectedPlace.wifiStatus}</p>
                   </div>
-                  <div className="bg-[#F4EFE8] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500">
+                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
+                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
                       🔊 Suasana
                     </p>
                     <p className="font-semibold">{selectedPlace.noiseLevel}</p>
                   </div>
-                  <div className="bg-[#F4EFE8] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500">
-                      <FaUsers className="text-[#8B6B4F]" /> Kepadatan
+                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
+                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
+                      <FaUsers className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
+                      Kepadatan
                     </p>
                     <p className="font-semibold">
                       {selectedPlace.visitors} Orang
@@ -744,7 +770,7 @@ export default function Beranda() {
                   </div>
                 </div>
               </div>
-              <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-4">
                 <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg">
                   <FaLocationArrow /> Rute ke Sini
                 </button>
@@ -754,27 +780,21 @@ export default function Beranda() {
         </div>
       )}
 
-      {/* ========================================= */}
-      {/* 2. MODAL POP-UP IKLAN/BANNER */}
-      {/* ========================================= */}
       {selectedBanner && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#445234]/60 backdrop-blur-md transition-opacity duration-300 px-4"
           onClick={() => setSelectedBanner(null)}
         >
           <div
-            className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-lg animate-scale-in relative flex flex-col"
+            className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-2xl overflow-hidden w-full max-w-lg animate-scale-in relative flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Tombol Close */}
             <button
               onClick={() => setSelectedBanner(null)}
               className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70 hover:rotate-90 transition-all duration-300 shadow-sm"
             >
               <FaTimes size={18} />
             </button>
-
-            {/* Gambar Banner Modal */}
             <div className="w-full h-56 sm:h-64 overflow-hidden relative">
               <img
                 src={selectedBanner.image}
@@ -783,36 +803,31 @@ export default function Beranda() {
               />
               <div className="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/60 to-transparent"></div>
             </div>
-
-            {/* Konten Detail Banner */}
-            <div className="p-6 md:p-8 flex flex-col flex-1 bg-[#fdfcfa]">
+            <div className="p-6 md:p-8 flex flex-col flex-1 bg-[#fdfcfa] dark:bg-[#2A2521]">
               <div className="flex items-center gap-2 mb-3">
-                <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                <span className="bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   <FaTag size={10} /> Penawaran Spesial
                 </span>
-                <span className="text-[#8B6B4F] text-xs font-bold border border-[#8B6B4F] px-3 py-1 rounded-full">
+                <span className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold border border-[#8B6B4F] dark:border-[#C4A876] px-3 py-1 rounded-full">
                   {selectedBanner.brand}
                 </span>
               </div>
-
-              <h2 className="text-2xl md:text-3xl font-extrabold text-[#594A42] mb-2 leading-tight">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] mb-2 leading-tight">
                 {selectedBanner.title}
               </h2>
-              <p className="text-[#8B6B4F] font-bold text-sm md:text-base mb-4">
+              <p className="text-[#8B6B4F] dark:text-[#C4A876] font-bold text-sm md:text-base mb-4">
                 {selectedBanner.subtitle}
               </p>
-
-              <div className="bg-[#EBE7DF] p-5 rounded-2xl mb-6">
-                <p className="text-gray-700 text-sm leading-relaxed font-medium">
+              <div className="bg-[#EBE7DF] dark:bg-[#1F1B18] p-5 rounded-2xl mb-6">
+                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed font-medium">
                   {selectedBanner.detail}
                 </p>
               </div>
-
               <button
                 onClick={() => setSelectedBanner(null)}
                 className="w-full py-4 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-lg hover:shadow-xl mt-auto"
               >
-                Mengerti
+                Mengerti, Tutup
               </button>
             </div>
           </div>

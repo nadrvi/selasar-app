@@ -97,7 +97,6 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-neutral-800 flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-hidden">
-      {/* Container Utama - Ditambahkan logika animasi transition */}
       <div
         className={`flex flex-col md:flex-row md:rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden max-w-[1000px] w-full md:min-h-[300px] bg-[#BCAA97] transition-all duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
           isExiting
@@ -109,7 +108,6 @@ export default function Register() {
       >
         {/* SISI KIRI (Area Form) */}
         <div className="md:w-[60%] flex flex-col relative ">
-          {/* Header Cokelat Tua (Hanya muncul di Mobile/sm) */}
           <div className="w-full bg-[#8B7A6A] h-20 sm:h-24 flex items-center px-6 md:hidden">
             <button
               onClick={handleBackToLogin}
@@ -132,7 +130,7 @@ export default function Register() {
             </button>
           </div>
 
-          {/* Tombol Back Desktop (Muncul di md ke atas) */}
+          {/* Tombol Back Desktop */}
           <button
             onClick={handleBackToLogin}
             className="hidden md:flex absolute top-8 left-8 w-10 h-10 bg-[#F0EBE3] rounded-full items-center justify-center text-[#8B7A6A] hover:bg-white active:scale-95 transition-all shadow-md z-10 cursor-pointer"
