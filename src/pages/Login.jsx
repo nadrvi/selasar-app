@@ -153,12 +153,6 @@ export default function Login() {
             <button type="submit" className="w-full bg-[#5B4744] hover:bg-[#463633] active:scale-95 text-white py-3 rounded-full font-semibold transition-all">
               Login
             </button>
-
-            {/* FORGOT */}
-            <Link to="#" className="text-center text-xs text-white mt-3 hover:underline">
-              Forgot password?
-            </Link>
-
             <div className="h-8"></div>
 
             {/* REGISTER (Diubah dari Link jadi Button) */}
