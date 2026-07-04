@@ -386,7 +386,7 @@ export default function Settings() {
     },
     {
       q: "Bagaimana cara menghubungi dukungan pelanggan?",
-      a: "Kirim email ke support@selasar.app atau chat kami setiap hari pukul 09.00–21.00 WIB.",
+      a: "Kirim email ke support@selasar.app atau chat kami setiap hari pukul 09.00–24.00 WIB.",
     },
     {
       q: "Apakah data pribadi saya aman?",
