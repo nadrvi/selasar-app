@@ -7,6 +7,7 @@ import Searching from "./pages/Searching";
 import Profile from "./pages/Profile";
 import Map from "./pages/Map";
 import Settings from "./pages/Settings";
+import Landing from "./pages/Landing";
 
 function App() {
   return (
@@ -14,7 +15,8 @@ function App() {
       <Router>
         <div className="font-sans text-gray-900 dark:text-gray-100 transition-colors duration-500 min-h-screen">
           <Routes>
-            <Route path="/" element={<Login />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/beranda" element={<Beranda />} />
             <Route path="/searching" element={<Searching />} />

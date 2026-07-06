@@ -106,7 +106,7 @@ function RevealOnScroll({ children, delay = 0 }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
+    const observer = new IntersectionObserver(  
       ([entry]) => {
         if (entry.isIntersecting) {
           setVisible(true);
@@ -150,7 +150,7 @@ export default function Beranda() {
   const [dragDistance, setDragDistance] = useState(0);
   const [activeSlide, setActiveSlide] = useState(0);
 
-  const [greeting, setGreeting] = useState("Halo,");
+  const [greeting, setGreeting] = useState("halo, ");
   const [hintIndex, setHintIndex] = useState(0);
   const [headingIndex, setHeadingIndex] = useState(0);
   useEffect(() => {

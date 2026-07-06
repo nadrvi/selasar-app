@@ -91,7 +91,7 @@ export default function Register() {
     e.preventDefault();
     setIsExiting(true);
     setTimeout(() => {
-      navigate("/");
+      navigate("/login");
     }, 500);
   };
 
