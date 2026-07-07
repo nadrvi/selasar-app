@@ -135,7 +135,7 @@ export default function Landing() {
 
   return (
     <div
-      className={`relative min-h-screen bg-[#EBE7DF]  overflow-x-hidden font-sans transition-opacity duration-700 ease-out ${
+      className={`relative min-h-screen bg-[#EBE7DF] dark:bg-[#1F1B18] overflow-x-hidden font-sans transition-opacity duration-700 ease-out ${
         isLoaded ? "opacity-100" : "opacity-0"
       } select-none`}
     >
