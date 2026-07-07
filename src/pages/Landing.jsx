@@ -117,6 +117,12 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const previewPlaces = placesData.slice(0, 3);
 
+  // --- TAMBAHAN FIX: Memaksa Light Mode saat komponen dimuat ---
+  useEffect(() => {
+    document.documentElement.classList.remove("dark");
+  }, []);
+  // -------------------------------------------------------------
+
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 50);
     return () => clearTimeout(timer);
