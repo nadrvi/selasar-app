@@ -61,19 +61,19 @@ const steps = [
 
 const testimonials = [
   {
-    name: "Raka A.",
+    name: "Qonita P.",
     role: "Mahasiswa Teknik Informatika",
     quote:
       "Selasar nyelametin skripsi gw. Tinggal buka, langsung ketemu tempat sepi dengan colokan di tiap meja.",
   },
   {
-    name: "Dinda P.",
+    name: "Andra",
     role: "Freelance Designer",
     quote:
       "Suka banget fitur cek WiFi-nya. Gak ada lagi drama meeting client putus-putus gara-gara salah pilih cafe.",
   },
   {
-    name: "Fajar S.",
+    name: "Malaka",
     role: "Mahasiswa Manajemen",
     quote:
       "Filter suasananya ngebantu banget buat yang gampang keganggu. Sekali coba langsung jadi rutinitas nugas gw.",
