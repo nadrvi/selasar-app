@@ -18,4 +18,5 @@
     }
   }
 }
-@custom-variant dark (&:where(.dark, .dark *));
+
+@variant dark (&:where(.dark, .dark *));
