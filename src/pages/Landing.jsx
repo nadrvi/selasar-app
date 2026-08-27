@@ -383,7 +383,7 @@ export default function Landing() {
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-20 grid md:grid-cols-2 gap-12 items-center">
           <RevealOnScroll>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 dark:bg-[#2A2521]/70 backdrop-blur-sm border border-white/50 dark:border-[#3D342D] mb-6 shadow-sm select-none">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {/* <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> */}
               <p className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold uppercase tracking-widest">
                 Study &amp; Coworking Space Finder
               </p>
@@ -391,11 +391,6 @@ export default function Landing() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] leading-[1.15] mb-6 tracking-tight">
               Temukan Sudut Nugas yang Pas, Kapan Aja
             </h1>
-            <p className="text-base sm:text-lg text-[#7D7063] dark:text-gray-300 leading-relaxed mb-8 max-w-md">
-              Selasar bantu kamu nemuin cafe, ruang coworking, sampai perpustakaan
-              terdekat — lengkap dengan info colokan, WiFi, dan suasana real-time.
-            </p>
-
             {/* QUICK SEARCH BAR */}
             <div className="bg-white dark:bg-[#2A2521] p-2 sm:p-2.5 rounded-full shadow-xl border border-white/60 dark:border-[#3D342D] flex items-center gap-2 mb-8 transition-all hover:shadow-2xl">
               <div className="pl-4 text-gray-400 select-none">
