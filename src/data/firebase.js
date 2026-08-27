@@ -26,3 +26,7 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const facebookProvider = new FacebookAuthProvider();
 export const githubProvider = new GithubAuthProvider();
+
+// Tambahkan scope email jika diperlukan
+githubProvider.addScope("user:email");
+facebookProvider.addScope("email");
