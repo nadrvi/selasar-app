@@ -378,17 +378,11 @@ export default function Landing() {
         </header>
       </div>
 
-      <main className="relative z-10 pt-20">
+      <main className="relative z-10 pt-1">
         {/* HERO SECTION */}
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-20 grid md:grid-cols-2 gap-12 items-center">
           <RevealOnScroll>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 dark:bg-[#2A2521]/70 backdrop-blur-sm border border-white/50 dark:border-[#3D342D] mb-6 shadow-sm select-none">
-              {/* <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> */}
-              <p className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold uppercase tracking-widest">
-                Study &amp; Coworking Space Finder
-              </p>
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] leading-[1.15] mb-6 tracking-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] leading-[1.15] mb-6 mt-20 tracking-tight">
               Temukan Sudut Nugas yang Pas, Kapan Aja
             </h1>
             {/* QUICK SEARCH BAR */}

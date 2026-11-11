@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -9,10 +10,21 @@ import Map from "./pages/Map";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname]);
+
+  return null;
+}
+
 function App() {
   return (
     <ThemeProvider> 
       <Router>
+        <ScrollToTop />
         <div className="font-sans text-gray-900 dark:text-gray-100 transition-colors duration-500 min-h-screen">
           <Routes>
             <Route path="/" element={<Landing />} />

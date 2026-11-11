@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import textLogo from "../assets/text-logo.png";
 import { placesData } from "../data/place";
+import SelasarMap from "../components/SelasarMap";
 import {
   logVisit,
   toggleFavorite as toggleFavoriteStore,
@@ -17,6 +18,7 @@ import {
   FaTag,
   FaCog,
   FaFilter,
+  FaSearch,
 } from "react-icons/fa";
 
 const banners = [
@@ -135,7 +137,9 @@ function RevealOnScroll({ children, delay = 0 }) {
 export default function Beranda() {
   const navigate = useNavigate();
   const [destination, setDestination] = useState(null);
-  const isTransitioning = !!destination;
+  const [isSearchingTransition, setIsSearchingTransition] = useState(false);
+  const [berandaQuery, setBerandaQuery] = useState("");
+  const isTransitioning = Boolean(destination) || isSearchingTransition;
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("Show Everything");
@@ -174,13 +178,19 @@ export default function Beranda() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 50);
+    const timer = setTimeout(() => setIsLoaded(true), 30);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (destination) {
-      const timer = setTimeout(() => navigate(destination), 500);
+      const timer = setTimeout(() => {
+        if (typeof destination === "string") {
+          navigate(destination);
+        } else {
+          navigate(destination.path, destination.options);
+        }
+      }, 280);
       return () => clearTimeout(timer);
     }
   }, [destination, navigate]);
@@ -304,7 +314,32 @@ export default function Beranda() {
     setSelectedPlace(place);
   };
 
-  const handleNavigate = (path) => setDestination(path);
+  const triggerSearchTransition = (targetQuery) => {
+    const queryToUse =
+      typeof targetQuery === "string" ? targetQuery : berandaQuery;
+    const navState = { query: queryToUse, autoFocus: true };
+
+    if (typeof document !== "undefined" && "startViewTransition" in document) {
+      document.startViewTransition(() => {
+        navigate("/searching", { state: navState });
+      });
+    } else {
+      setIsSearchingTransition(true);
+      setTimeout(() => {
+        navigate("/searching", { state: navState });
+      }, 280);
+    }
+  };
+
+  const handleNavigate = (path, options = {}) => {
+    if (typeof document !== "undefined" && "startViewTransition" in document) {
+      document.startViewTransition(() => {
+        navigate(path, options);
+      });
+    } else {
+      setDestination({ path, options });
+    }
+  };
 
   const resetFilters = () => {
     setActiveFilter("Show Everything");
@@ -354,8 +389,8 @@ export default function Beranda() {
 
       <div className="relative z-10">
         <nav
-          className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            isTransitioning ? "opacity-0 -translate-y-8" : "opacity-100"
+          className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-300 ease-out ${
+            isTransitioning ? "opacity-0 -translate-y-2 pointer-events-none" : "opacity-100 translate-y-0"
           }`}
         >
           <div className="w-[76px]"></div>
@@ -363,6 +398,7 @@ export default function Beranda() {
             <img
               src={textLogo}
               alt="Selasar Logo"
+              style={{ viewTransitionName: "selasar-logo" }}
               className="h-16 w-auto object-contain"
             />
           </div>
@@ -380,8 +416,8 @@ export default function Beranda() {
 
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex flex-col items-center">
           <div
-            className={`text-center mb-6 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              isTransitioning ? "opacity-0 -translate-y-4" : "opacity-100"
+            className={`text-center mb-6 transition-all duration-300 ease-out ${
+              isTransitioning ? "opacity-0 -translate-y-2 pointer-events-none" : "opacity-100 translate-y-0"
             }`}
           >
             <p className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold uppercase tracking-[0.2em] mb-2">
@@ -395,39 +431,29 @@ export default function Beranda() {
             </h1>
           </div>
 
+          {/* INTERACTIVE REAL-TIME MAP PREVIEW */}
           <div
-            onClick={() => handleNavigate("/map")}
-            className={`w-full h-[280px] cursor-pointer relative group overflow-hidden rounded-[2.5rem] border border-gray-200 dark:border-[#3D342D] shadow-md transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            className={`w-full transition-all duration-300 ease-out ${
               isTransitioning
-                ? "opacity-0 scale-[0.98] blur-sm"
+                ? "opacity-0 scale-[0.99] pointer-events-none"
                 : "opacity-100 scale-100"
             }`}
           >
-            <iframe
-              title="Map Area"
-              src="https://www.openstreetmap.org/export/embed.html?bbox=106.75%2C-6.25%2C106.85%2C-6.15&layer=mapnik"
-              className="w-full h-full border-0 grayscale-[70%] contrast-[1.1] brightness-[0.9] dark:brightness-[0.6] transition-all duration-500 group-hover:grayscale-0 group-hover:brightness-100"
-              style={{ pointerEvents: "none" }}
-            ></iframe>
-
-            <div className="absolute top-6 left-6 flex items-center gap-2 bg-[#EBE7DF]/80 dark:bg-[#2A2521]/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/50 dark:border-[#3D342D] shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-[#594A42] dark:bg-[#C4A876] animate-pulse"></div>
-              <span className="text-[#594A42] dark:text-[#F5F2EB] text-xs font-bold uppercase tracking-widest">
-                Eksplor Peta
-              </span>
-            </div>
-
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="relative">
-                <div className="w-4 h-4 bg-[#594A42] dark:bg-[#C4A876] rounded-full border-2 border-white dark:border-[#2A2521] shadow-lg animate-pulse"></div>
-                <div className="absolute -inset-2 bg-[#594A42]/20 dark:bg-[#C4A876]/20 rounded-full animate-ping"></div>
-              </div>
-            </div>
+            <SelasarMap
+              places={filteredPlaces}
+              activeCity={activeFilter}
+              selectedPlaceId={selectedPlace?.id}
+              onSelectPlace={(place) => handleSelectPlace(place)}
+              mode="preview"
+              onOpenFullMap={() =>
+                handleNavigate("/map", { state: { city: activeFilter } })
+              }
+            />
           </div>
 
           <div
-            className={`w-full mt-8 mb-2 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] delay-75 ${
-              isTransitioning ? "opacity-0 translate-y-4" : "opacity-100"
+            className={`w-full mt-8 mb-2 transition-all duration-300 ease-out ${
+              isTransitioning ? "opacity-0 -translate-y-1 pointer-events-none" : "opacity-100 translate-y-0"
             }`}
           >
             <div
@@ -487,44 +513,66 @@ export default function Beranda() {
             </div>
           </div>
 
-          <div
-            onClick={() => handleNavigate("/searching")}
-            className={`flex w-full max-w-[480px] relative shadow-lg rounded-full bg-[#fdfcfa] dark:bg-[#2A2521] border border-gray-300 dark:border-[#3D342D] h-14 cursor-text transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              isTransitioning
-                ? "scale-[1.1] -translate-y-[300px] opacity-100 z-50 border-[#594A42] dark:border-[#C4A876]"
-                : "hover:shadow-xl hover:-translate-y-1 z-10"
-            }`}
-          >
-            <div className="flex-1 relative flex items-center px-6 overflow-hidden rounded-l-full cursor-pointer">
-              <span
-                key={hintIndex}
-                className="text-sm text-gray-400 dark:text-gray-500 font-medium animate-fade-in-hint whitespace-nowrap"
+          {/* SEARCH BAR SECTION WITH FLUID TRANSITION */}
+          <div className="w-full max-w-xl z-20 flex flex-col items-center my-1">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                triggerSearchTransition(berandaQuery);
+              }}
+              style={{ viewTransitionName: "selasar-search-bar" }}
+              className={`flex w-full relative shadow-lg rounded-full bg-white dark:bg-[#2A2521] border border-gray-300 dark:border-[#3D342D] h-14 transition-all duration-300 ease-out ${
+                isSearchingTransition
+                  ? "scale-[1.02] shadow-2xl ring-2 ring-[#594A42]/30 dark:ring-[#C4A876]/40 -translate-y-2 border-[#594A42] dark:border-[#C4A876]"
+                  : "hover:shadow-xl hover:-translate-y-0.5 focus-within:ring-2 ring-[#594A42]/20 dark:ring-[#C4A876]/30"
+              }`}
+            >
+              <div
+                onClick={() => triggerSearchTransition(berandaQuery)}
+                className="flex-1 relative flex items-center px-6 overflow-hidden rounded-l-full cursor-text"
               >
-                {searchHints[hintIndex]}
-              </span>
-            </div>
-            <button className="w-16 bg-[#E5DFCF] dark:bg-[#3D342D] border-l border-gray-300 dark:border-[#3D342D] rounded-r-full flex items-center justify-center hover:bg-[#d5cebd] dark:hover:bg-[#453a32] transition-colors active:bg-[#c4bcab] dark:active:bg-[#332C27]">
-              <svg
-                className="w-5 h-5 text-gray-700 dark:text-gray-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                <input
+                  type="text"
+                  value={berandaQuery}
+                  onChange={(e) => setBerandaQuery(e.target.value)}
+                  placeholder={searchHints[hintIndex]}
+                  className="w-full bg-transparent text-sm font-semibold text-[#594A42] dark:text-[#F5F2EB] placeholder-gray-400 dark:placeholder-gray-500 outline-none"
                 />
-              </svg>
-            </button>
+              </div>
+              <button
+                type="submit"
+                aria-label="Cari Tempat"
+                className="w-16 bg-[#E5DFCF] dark:bg-[#332C27] border-l border-gray-200 dark:border-[#3D342D] rounded-r-full flex items-center justify-center hover:bg-[#d5cebd] dark:hover:bg-[#3D342D] transition-colors active:bg-[#c4bcab] dark:active:bg-[#28221e] text-[#594A42] dark:text-[#F5F2EB] shrink-0"
+              >
+                <FaSearch size={16} />
+              </button>
+            </form>
+
+            {/* Quick Search Tag Pills */}
+            <div
+              className={`flex flex-wrap items-center justify-center gap-2 mt-3.5 text-xs font-semibold text-[#8B6B4F] dark:text-[#C4A876] transition-all duration-300 ${
+                isTransitioning ? "opacity-0 -translate-y-1 pointer-events-none" : "opacity-100 translate-y-0"
+              }`}
+            >
+              <span className="text-gray-400 dark:text-gray-500 font-medium">Populer:</span>
+              {["Stopkontak Banyak", "WiFi Ngebut", "Tenang", "Buka 24 Jam"].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => triggerSearchTransition(tag)}
+                  className="px-3.5 py-1 rounded-full bg-white/70 dark:bg-[#2A2521]/70 border border-gray-200/80 dark:border-[#3D342D] hover:bg-white dark:hover:bg-[#2A2521] hover:border-[#8B6B4F] dark:hover:border-[#C4A876] transition-all hover:scale-105 active:scale-95 shadow-xs"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* MENU FILTER EXPANDABLE */}
           <div
-            className={`flex justify-center items-center mt-10 mb-6 transition-all duration-500 ease-in-out delay-150 ${
+            className={`flex justify-center items-center mt-8 mb-6 transition-all duration-300 ease-out ${
               isTransitioning
-                ? "opacity-0 translate-y-10"
+                ? "opacity-0 translate-y-2 pointer-events-none"
                 : "opacity-100 translate-y-0"
             }`}
           >
@@ -599,9 +647,9 @@ export default function Beranda() {
 
         {/* GRID DAFTAR TEMPAT */}
         <div
-          className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-500 ease-in-out delay-200 ${
+          className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ease-out ${
             isTransitioning
-              ? "opacity-0 translate-y-12"
+              ? "opacity-0 translate-y-4 pointer-events-none"
               : "opacity-100 translate-y-0"
           }`}
         >
@@ -791,7 +839,24 @@ export default function Beranda() {
                 </div>
               </div>
               <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-4">
-                <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg">
+                <button
+                  onClick={() => {
+                    if (selectedPlace?.lat && selectedPlace?.lng) {
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}`,
+                        "_blank",
+                      );
+                    } else {
+                      window.open(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          selectedPlace.name + " " + selectedPlace.city,
+                        )}`,
+                        "_blank",
+                      );
+                    }
+                  }}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg cursor-pointer"
+                >
                   <FaLocationArrow /> Rute ke Sini
                 </button>
               </div>
@@ -843,12 +908,6 @@ export default function Beranda() {
                   {selectedBanner.detail}
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedBanner(null)}
-                className="w-full py-4 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-lg hover:shadow-xl mt-auto"
-              >
-                Mengerti, Tutup
-              </button>
             </div>
           </div>
         </div>

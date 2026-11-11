@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FaWifi,
   FaUsers,
@@ -27,7 +27,8 @@ const dummyPlaces = [
     id: 1,
     name: "Kebon Raya Escape",
     type: "Alam",
-    address: "Jl. Otto Iskandardinata No. 13",
+    city: "Bogor",
+    address: "Jl. Otto Iskandardinata No. 13, Bogor",
     img: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80",
     colokan: "Terbatas",
     wifi: "Standar",
@@ -43,6 +44,7 @@ const dummyPlaces = [
     id: 2,
     name: "Kopi Nalar",
     type: "Cafe",
+    city: "Jakarta",
     address: "Jl. Masjid Nurul Hidayah, Tambun",
     img: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1000&q=80",
     colokan: "Tersedia",
@@ -59,6 +61,7 @@ const dummyPlaces = [
     id: 3,
     name: "Ruang Seduh",
     type: "Coworking",
+    city: "Jakarta",
     address: "Jl. Kemang Raya, Jakarta",
     img: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1000&q=80",
     colokan: "Banyak",
@@ -75,7 +78,8 @@ const dummyPlaces = [
     id: 4,
     name: "Forest Brew",
     type: "Cafe",
-    address: "Jl. Raya Hankam No. 22",
+    city: "Bekasi",
+    address: "Jl. Raya Hankam No. 22, Bekasi",
     img: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=1000&q=80",
     colokan: "Banyak",
     wifi: "Cepat",
@@ -91,7 +95,8 @@ const dummyPlaces = [
     id: 5,
     name: "Skyline Coffee",
     type: "Cafe",
-    address: "Jl. Ahmad Yani No. 45",
+    city: "Bandung",
+    address: "Jl. Ahmad Yani No. 45, Bandung",
     img: "https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1000&q=80",
     colokan: "Tersedia",
     wifi: "Cepat",
@@ -107,7 +112,8 @@ const dummyPlaces = [
     id: 6,
     name: "Creative Hub",
     type: "Coworking",
-    address: "Jl. Diponegoro No. 10",
+    city: "Bandung",
+    address: "Jl. Diponegoro No. 10, Bandung",
     img: "https://images.unsplash.com/photo-1497366412874-3415097a27e7?auto=format&fit=crop&w=1000&q=80",
     colokan: "Banyak",
     wifi: "Super Cepat",
@@ -123,7 +129,8 @@ const dummyPlaces = [
     id: 7,
     name: "Taman Harmoni",
     type: "Alam",
-    address: "Jl. Raya Bekasi No. 88",
+    city: "Bekasi",
+    address: "Jl. Raya Bekasi No. 88, Bekasi",
     img: "https://images.unsplash.com/photo-1473773508845-188df298d2d1?auto=format&fit=crop&w=1000&q=80",
     colokan: "Tidak Ada",
     wifi: "Tidak Tersedia",
@@ -139,7 +146,8 @@ const dummyPlaces = [
     id: 8,
     name: "Daily Grind",
     type: "Cafe",
-    address: "Jl. Kalimalang No. 7",
+    city: "Jakarta",
+    address: "Jl. Kalimalang No. 7, Jakarta",
     img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80",
     colokan: "Banyak",
     wifi: "Cepat",
@@ -155,7 +163,8 @@ const dummyPlaces = [
     id: 9,
     name: "Library Corner",
     type: "Perpustakaan",
-    address: "Jl. Pendidikan No. 15",
+    city: "Bogor",
+    address: "Jl. Pendidikan No. 15, Bogor",
     img: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1000&q=80",
     colokan: "Tersedia",
     wifi: "Cepat",
@@ -171,7 +180,8 @@ const dummyPlaces = [
     id: 10,
     name: "Sunrise Workspace",
     type: "Coworking",
-    address: "Jl. Boulevard Selatan No. 5",
+    city: "Jakarta",
+    address: "Jl. Boulevard Selatan No. 5, Jakarta",
     img: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1000&q=80",
     colokan: "Sangat Banyak",
     wifi: "Super Cepat",
@@ -196,27 +206,43 @@ const SORT_OPTIONS = [
 
 export default function Searching() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [activeFilters, setActiveFilters] = useState({
-    colokan: "Semua",
-    wifi: "Semua",
-    keramaian: "Semua",
-  });
+  const [activeFilters, setActiveFilters] = useState(() => ({
+    colokan: location.state?.filters?.colokan || "Semua",
+    wifi: location.state?.filters?.wifi || "Semua",
+    keramaian: location.state?.filters?.keramaian || "Semua",
+  }));
 
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(
+    () => location.state?.query || "",
+  );
   const [isExiting, setIsExiting] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState("");
   const [showRecent, setShowRecent] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 50);
-    return () => clearTimeout(timer);
-  }, []);
+    if (location.state?.autoFocus !== false) {
+      const timer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const len = inputRef.current.value.length;
+          inputRef.current.setSelectionRange(len, len);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   const handleBackClick = () => {
-    setIsExiting(true);
-    setTimeout(() => navigate("/beranda"), 500);
+    if (typeof document !== "undefined" && "startViewTransition" in document) {
+      document.startViewTransition(() => {
+        navigate("/beranda");
+      });
+    } else {
+      setIsExiting(true);
+      setTimeout(() => navigate("/beranda"), 280);
+    }
   };
 
   const handleFilterClick = (category, value) => {
@@ -241,10 +267,27 @@ export default function Searching() {
   };
 
   const filteredPlaces = dummyPlaces.filter((place) => {
+    const q = searchQuery.toLowerCase().trim();
     const matchSearch =
-      place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      place.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      place.cocok.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      place.name.toLowerCase().includes(q) ||
+      place.address.toLowerCase().includes(q) ||
+      place.cocok.toLowerCase().includes(q) ||
+      place.type.toLowerCase().includes(q) ||
+      (place.city && place.city.toLowerCase().includes(q)) ||
+      (q.includes("colokan") && place.colokan.toLowerCase() !== "tidak ada") ||
+      (q.includes("stopkontak") &&
+        place.colokan.toLowerCase() !== "tidak ada") ||
+      (q.includes("wifi") && place.wifi.toLowerCase() !== "tidak tersedia") ||
+      (q.includes("ngebut") &&
+        (place.wifi === "Cepat" || place.wifi === "Super Cepat")) ||
+      (q.includes("tenang") &&
+        (place.keramaian === "Sepi" ||
+          place.keramaian === "Sangat Sepi" ||
+          place.keramaian === "Sedang")) ||
+      (q.includes("hening") &&
+        (place.keramaian === "Sepi" || place.keramaian === "Sangat Sepi")) ||
+      (q.includes("24 jam") && place.type === "Coworking");
 
     const matchColokan =
       activeFilters.colokan === "Semua" ||
@@ -322,63 +365,86 @@ export default function Searching() {
     <div className="min-h-screen bg-[#EDE8DE] dark:bg-[#1F1B18] p-4 sm:p-6 md:p-8 font-sans flex flex-col items-center overflow-x-hidden transition-colors duration-500">
       {/* HEADER */}
       <div
-        className={`w-full max-w-2xl relative flex justify-center items-center mb-6 transition-all duration-500 ease-out ${
-          isExiting
-            ? "opacity-0 -translate-y-8"
-            : isLoaded
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 -translate-y-8"
+        className={`w-full max-w-xl relative flex justify-center items-center mb-6 transition-all duration-300 ease-out ${
+          isExiting ? "opacity-0 -translate-y-4" : "opacity-100 translate-y-0"
         }`}
       >
         <button
           onClick={handleBackClick}
+          aria-label="Kembali ke Beranda"
           className="absolute left-0 p-3 bg-white dark:bg-[#2A2521] text-[#4A3B38] dark:text-[#F5F2EB] rounded-full shadow-sm border border-gray-200 dark:border-[#3D342D] hover:bg-[#F3EFEA] dark:hover:bg-[#332C27] hover:scale-105 active:scale-95 transition-all"
         >
           <FaArrowLeft size={16} />
         </button>
-        <img
-          src={TextSelasar}
-          alt="Logo Selasar"
-          className="w-48 sm:w-56 h-auto object-contain drop-shadow-sm"
-        />
+        <button
+          onClick={handleBackClick}
+          className="focus:outline-none"
+          aria-label="Selasar Logo"
+        >
+          <img
+            src={TextSelasar}
+            alt="Logo Selasar"
+            style={{ viewTransitionName: "selasar-logo" }}
+            className="w-44 sm:w-52 h-auto object-contain drop-shadow-sm hover:opacity-90 transition-opacity"
+          />
+        </button>
       </div>
 
       {/* SEARCH BAR */}
       <div
-        className={`w-full max-w-2xl mb-8 flex justify-center transition-all duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] z-20 ${
+        className={`w-full max-w-xl mb-8 flex justify-center z-20 transition-all duration-300 ease-out ${
           isExiting
-            ? "opacity-0 translate-y-24 scale-90"
-            : isLoaded
-              ? "opacity-100 translate-y-0 scale-100"
-              : "opacity-0 translate-y-10 scale-105"
+            ? "opacity-0 translate-y-2 scale-98"
+            : "opacity-100 translate-y-0 scale-100"
         }`}
       >
-        <div className="relative w-full sm:w-[80%] max-w-lg group">
-          <div className="flex bg-white dark:bg-[#2A2521] rounded-full border border-[#523E3E] dark:border-[#6B554F] shadow-sm overflow-hidden w-full focus-within:ring-2 ring-[#523E3E] dark:ring-[#C4A876] transition-all">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setShowRecent(true)}
-              onBlur={() => setTimeout(() => setShowRecent(false), 200)}
-              placeholder="Cari nama tempat, alamat, atau vibes..."
-              className="flex-1 px-6 py-3 outline-none text-sm text-gray-700 dark:text-gray-200 bg-transparent placeholder-gray-400 dark:placeholder-gray-500"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="px-3 text-gray-400 dark:text-gray-500 hover:text-[#523E3E] dark:hover:text-[#C4A876] transition-colors"
-              >
-                <FaTimes />
-              </button>
-            )}
-            <button className="px-6 bg-[#EAE1DD] dark:bg-[#332C27] border-l border-[#523E3E] dark:border-[#6B554F] text-[#4A3B38] dark:text-[#F5F2EB] hover:bg-[#dcd0cb] dark:hover:bg-[#3D342D] transition-colors">
-              <FaSearch />
+        <div
+          style={{ viewTransitionName: "selasar-search-bar" }}
+          className="relative w-full group"
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setShowRecent(false);
+            }}
+            className="flex bg-white dark:bg-[#2A2521] rounded-full border border-gray-300 dark:border-[#3D342D] shadow-md hover:shadow-lg focus-within:shadow-xl focus-within:ring-2 ring-[#594A42]/20 dark:ring-[#C4A876]/30 transition-all h-14 overflow-hidden w-full"
+          >
+            <div className="flex-1 flex items-center px-6">
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowRecent(true)}
+                onBlur={() => setTimeout(() => setShowRecent(false), 200)}
+                placeholder="Cari nama tempat, suasana, atau kota..."
+                className="w-full outline-none text-sm font-semibold text-[#594A42] dark:text-[#F5F2EB] bg-transparent placeholder-gray-400 dark:placeholder-gray-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    inputRef.current?.focus();
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-[#594A42] dark:hover:text-[#F5F2EB] transition-colors rounded-full hover:bg-black/5 dark:hover:bg-white/5 mr-1"
+                >
+                  <FaTimes size={14} />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              aria-label="Cari"
+              className="w-16 bg-[#E5DFCF] dark:bg-[#332C27] border-l border-gray-200 dark:border-[#3D342D] text-[#594A42] dark:text-[#F5F2EB] hover:bg-[#d5cebd] dark:hover:bg-[#3D342D] transition-colors flex items-center justify-center shrink-0"
+            >
+              <FaSearch size={16} />
             </button>
-          </div>
+          </form>
 
+          {/* RECENT SEARCHES DROPDOWN */}
           <div
-            className={`absolute top-14 left-0 w-full bg-white dark:bg-[#2A2521] rounded-2xl shadow-xl overflow-hidden transition-all duration-300 origin-top ${
+            className={`absolute top-16 left-0 w-full bg-white dark:bg-[#2A2521] rounded-2xl shadow-xl border border-gray-100 dark:border-[#3D342D] overflow-hidden transition-all duration-300 origin-top z-30 ${
               showRecent && !searchQuery
                 ? "opacity-100 scale-y-100"
                 : "opacity-0 scale-y-0 pointer-events-none"
@@ -386,19 +452,28 @@ export default function Searching() {
           >
             <div className="p-4">
               <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-2">
-                <FaHistory /> Pencarian Terakhir
+                <FaHistory /> Pencarian Populer &amp; Terakhir
               </p>
-              {["Ruang Seduh", "Kopi Nalar", "Tempat sepi di Bogor"].map(
-                (item) => (
-                  <div
-                    key={item}
-                    onClick={() => setSearchQuery(item)}
-                    className="px-3 py-2.5 hover:bg-[#F3EFEA] dark:hover:bg-[#332C27] rounded-lg cursor-pointer text-sm font-medium text-[#4A3B38] dark:text-[#F5F2EB] transition-colors"
-                  >
-                    {item}
-                  </div>
-                ),
-              )}
+              {[
+                "Ruang Seduh",
+                "Kopi Nalar",
+                "Stopkontak Banyak",
+                "WiFi Ngebut",
+                "Bogor",
+                "Bandung",
+              ].map((item) => (
+                <div
+                  key={item}
+                  onMouseDown={() => {
+                    setSearchQuery(item);
+                    setShowRecent(false);
+                  }}
+                  className="px-3 py-2.5 hover:bg-[#F3EFEA] dark:hover:bg-[#332C27] rounded-lg cursor-pointer text-sm font-medium text-[#4A3B38] dark:text-[#F5F2EB] transition-colors flex items-center justify-between"
+                >
+                  <span>{item}</span>
+                  <span className="text-xs text-gray-400">Pilih</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -406,12 +481,8 @@ export default function Searching() {
 
       {/* KONTEN BAWAH */}
       <div
-        className={`w-full flex flex-col items-center transition-all duration-500 ease-out ${
-          isExiting
-            ? "opacity-0 translate-y-16"
-            : isLoaded
-              ? "opacity-100 translate-y-0 delay-150"
-              : "opacity-0 translate-y-16"
+        className={`w-full flex flex-col items-center transition-all duration-300 ease-out ${
+          isExiting ? "opacity-0 translate-y-6" : "opacity-100 translate-y-0"
         }`}
       >
         {/* FILTER SECTION */}
