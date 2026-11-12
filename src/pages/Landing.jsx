@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useTheme } from "../context/ThemeContext";
 import textLogo from "../assets/text-logo.png";
 import Daun from "../assets/Daun.png";
 import DaunBawah from "../assets/Daun_half.png";
@@ -145,26 +146,7 @@ export default function Landing() {
   const categories = ["Semua", "Quiet Zone", "Buka 24 Jam", "Cafe Aesthetic"];
   const previewPlaces = placesData.slice(0, 3);
 
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("theme");
-      if (savedTheme) {
-        return savedTheme === "dark";
-      }
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDarkMode) {
-      root.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  }, [isDarkMode]);
+  const { darkMode: isDarkMode, toggleDarkMode } = useTheme();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 50);
@@ -272,7 +254,7 @@ export default function Landing() {
             {/* Tombol Action Desktop */}
             <div className="hidden md:flex items-center gap-3">
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={toggleDarkMode}
                 className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/60 hover:bg-white dark:bg-[#2A2521]/60 dark:hover:bg-[#2A2521] text-[#594A42] dark:text-[#F5F2EB] shadow-sm hover:shadow transition-all active:scale-90 border border-white/60 dark:border-[#3D342D] overflow-hidden select-none"
                 aria-label="Toggle Dark Mode"
               >
@@ -313,7 +295,7 @@ export default function Landing() {
             {/* Mobile View Toggle */}
             <div className="md:hidden flex items-center gap-2">
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={toggleDarkMode}
                 className="relative w-10 h-10 flex items-center justify-center rounded-full bg-[#594A42]/10 dark:bg-white/10 text-[#594A42] dark:text-[#F5F2EB] transition-colors active:scale-90 select-none"
                 aria-label="Toggle Dark Mode Mobile"
               >
@@ -441,13 +423,6 @@ export default function Landing() {
 
           {/* HERO IMAGE SHOWCASE */}
           <RevealOnScroll delay={150} className="relative mt-4 md:mt-0">
-            <img
-              src={Daun}
-              alt=""
-              aria-hidden="true"
-              className="hidden sm:block absolute -top-12 -right-8 sm:-top-14 sm:-right-10 w-28 sm:w-36 opacity-85 pointer-events-none select-none drop-shadow-lg z-20 animate-leaf-float"
-            />
-
             <div className="relative rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-xl border-4 border-white/70 dark:border-[#3D342D]/80 aspect-[4/3] group z-10">
               <img
                 src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80"
@@ -473,27 +448,6 @@ export default function Landing() {
                 </p>
               </div>
             </div>
-
-            <div className="absolute -bottom-5 right-3 sm:-bottom-6 sm:-right-6 bg-white/95 dark:bg-[#2A2521]/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/80 dark:border-[#3D342D] px-4 py-2.5 sm:px-5 sm:py-3 flex items-center gap-3 hover:-translate-y-1 transition-all duration-300 z-20 select-none cursor-default">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                <FaPlug size={16} className="animate-pulse" />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">
-                  Update Live
-                </p>
-                <p className="text-xs sm:text-sm font-extrabold text-[#594A42] dark:text-[#F5F2EB]">
-                  95% Colokan Kosong
-                </p>
-              </div>
-            </div>
-
-            <img
-              src={DaunBawah}
-              alt=""
-              aria-hidden="true"
-              className="hidden sm:block absolute -bottom-8 -left-8 w-24 sm:w-32 opacity-80 pointer-events-none select-none rotate-180 z-0 animate-leaf-float"
-            />
           </RevealOnScroll>
         </section>
 

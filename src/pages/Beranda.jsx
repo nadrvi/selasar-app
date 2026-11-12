@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import textLogo from "../assets/text-logo.png";
 import { placesData } from "../data/place";
 import SelasarMap from "../components/SelasarMap";
+import { fetchPlaces, fetchPromos, toggleBookmarkAPI } from "../services/api";
 import {
   logVisit,
   toggleFavorite as toggleFavoriteStore,
@@ -146,6 +147,34 @@ export default function Beranda() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [selectedBanner, setSelectedBanner] = useState(null);
+  const [placesList, setPlacesList] = useState(placesData);
+  const [promoList, setPromoList] = useState(banners);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchPlaces().then((data) => {
+      if (isMounted && data && data.length > 0) {
+        setPlacesList(data);
+      }
+    });
+    fetchPromos().then((promos) => {
+      if (isMounted && promos && promos.length > 0) {
+        setPromoList(
+          promos.map((p, idx) => ({
+            id: p.id || idx + 1,
+            title: p.title,
+            subtitle: p.subtitle,
+            detail: p.detail,
+            image: p.image_url || banners[idx % banners.length]?.image,
+            brand: p.brand_name || p.place_name || "Selasar",
+          }))
+        );
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const carouselRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -264,14 +293,14 @@ export default function Beranda() {
   const handleCarouselScroll = () => {
     if (!carouselRef.current) return;
     const { scrollLeft, scrollWidth } = carouselRef.current;
-    const slideWidth = scrollWidth / banners.length;
+    const slideWidth = scrollWidth / promoList.length;
     const index = Math.round(scrollLeft / slideWidth);
-    setActiveSlide(Math.max(0, Math.min(index, banners.length - 1)));
+    setActiveSlide(Math.max(0, Math.min(index, promoList.length - 1)));
   };
 
   const goToSlide = (index) => {
     if (!carouselRef.current) return;
-    const slideWidth = carouselRef.current.scrollWidth / banners.length;
+    const slideWidth = carouselRef.current.scrollWidth / promoList.length;
     carouselRef.current.scrollTo({
       left: slideWidth * index,
       behavior: "smooth",
@@ -286,7 +315,7 @@ export default function Beranda() {
 
   const toggleFavorite = (e, placeId) => {
     e.stopPropagation();
-    const place = placesData.find((p) => p.id === placeId);
+    const place = placesList.find((p) => p.id === placeId);
     toggleFavoriteStore({
       source: "beranda",
       id: placeId,
@@ -300,6 +329,16 @@ export default function Beranda() {
       else next.add(placeId);
       return next;
     });
+
+    // Sinkronkan ke PostgreSQL Backend (selasar-db) jika user login
+    try {
+      const user = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      if (user?.uid) {
+        toggleBookmarkAPI(user.uid, placeId);
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleSelectPlace = (place) => {
@@ -346,7 +385,7 @@ export default function Beranda() {
     setShowFavoritesOnly(false);
   };
 
-  const filteredPlaces = placesData.filter((place) => {
+  const filteredPlaces = placesList.filter((place) => {
     const cityMatch =
       activeFilter === "Show Everything" || place.city === activeFilter;
     const favMatch = !showFavoritesOnly || favorites.has(place.id);
@@ -469,7 +508,7 @@ export default function Beranda() {
               className="flex overflow-x-auto hide-scrollbar gap-4 pb-4 cursor-grab active:cursor-grabbing"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              {banners.map((banner) => (
+              {promoList.map((banner) => (
                 <div
                   key={banner.id}
                   onClick={() => handleBannerClick(banner)}
@@ -498,7 +537,7 @@ export default function Beranda() {
             </div>
 
             <div className="flex justify-center gap-2 mb-6">
-              {banners.map((_, i) => (
+              {promoList.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => goToSlide(i)}

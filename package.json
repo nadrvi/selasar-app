@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:backend": "node --watch --env-file=backend/.env backend/src/index.js",
+    "start:backend": "node backend/src/index.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

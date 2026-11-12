@@ -50,7 +50,12 @@ function getInitialDarkMode() {
   if (typeof window === "undefined") return false;
   const saved = window.localStorage.getItem(STORAGE_KEY);
   if (saved !== null) return saved === "true";
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  
+  const savedTheme = window.localStorage.getItem("theme");
+  if (savedTheme !== null) return savedTheme === "dark";
+
+  // DEFAULT THEME: Always default to Light Mode (Mode Terang) on first launch
+  return false;
 }
 
 export function ThemeProvider({ children }) {
@@ -60,6 +65,7 @@ export function ThemeProvider({ children }) {
     const root = document.documentElement;
     root.classList.toggle("dark", darkMode);
     window.localStorage.setItem(STORAGE_KEY, String(darkMode));
+    window.localStorage.setItem("theme", darkMode ? "dark" : "light");
   }, [darkMode]);
 
   const toggleDarkMode = (e) => {
