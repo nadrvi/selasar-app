@@ -1,10 +1,12 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import {
-  FaSearch,
-  FaCoffee,
-  FaBook,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
+import {
   FaUsers,
-  FaTree,
   FaMapMarkerAlt,
   FaWifi,
   FaPlug,
@@ -16,25 +18,21 @@ import {
   FaCompass,
   FaChevronUp,
   FaChevronDown,
+  FaPen,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { placesData } from "../data/place";
 import SelasarMap from "../components/SelasarMap";
+import CommunityReviewModal from "../components/CommunityReviewModal";
+import CommunityReviewsSection from "../components/CommunityReviewsSection";
 import {
   logVisit,
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
 
-const filterCategories = [
-  { label: "Semua", icon: null },
-  { label: "Cafe", icon: <FaCoffee /> },
-  { label: "Coworking", icon: <FaUsers /> },
-  { label: "Perpustakaan", icon: <FaBook /> },
-  { label: "Alam", icon: <FaTree /> },
-];
-
-const cityFilters = ["Semua Kota", "Jakarta", "Bandung", "Bogor"];
+const FALLBACK_PLACE_IMG =
+  "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
 
 export default function Map() {
   const navigate = useNavigate();
@@ -45,10 +43,25 @@ export default function Map() {
   const [highlightedId, setHighlightedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [modalTab, setModalTab] = useState("info"); // "info" | "reviews"
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [reviewRefreshTrigger, setReviewRefreshTrigger] = useState(0);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("selasarUser") || "null");
+    } catch {
+      return null;
+    }
+  });
+
   // Initial city from navigation state (e.g. from Beranda)
   const [activeCity, setActiveCity] = useState(() => {
     const passedCity = location.state?.city;
-    if (passedCity && passedCity !== "Show Everything" && passedCity !== "Semua") {
+    if (
+      passedCity &&
+      passedCity !== "Show Everything" &&
+      passedCity !== "Semua"
+    ) {
       return passedCity;
     }
     return "Semua Kota";
@@ -138,6 +151,12 @@ export default function Map() {
       subtitle: loc.address,
       match: loc.match,
     });
+    try {
+      setCurrentUser(JSON.parse(localStorage.getItem("selasarUser") || "null"));
+    } catch {
+      /* ignore */
+    }
+    setModalTab("info");
     setSelectedLocation(loc);
     setHighlightedId(loc.id);
 
@@ -264,8 +283,9 @@ export default function Map() {
 
   return (
     <div
-      className={`min-h-screen bg-[#EDE8DE] dark:bg-[#1F1B18] transition-colors duration-500 pb-20 ${isLoaded ? "opacity-100" : "opacity-0"
-        } transition-opacity duration-500`}
+      className={`min-h-screen bg-[#EDE8DE] dark:bg-[#1F1B18] transition-colors duration-500 pb-20 ${
+        isLoaded ? "opacity-100" : "opacity-0"
+      } transition-opacity duration-500`}
     >
       {/* HEADER SECTION */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
@@ -281,109 +301,18 @@ export default function Map() {
           <div
             onClick={handleBack}
             className="text-center cursor-pointer hover:opacity-90 transition-opacity min-w-0"
-          >
-            <h1 className="text-xl sm:text-3xl md:text-4xl font-serif font-extrabold text-[#594A42] dark:text-[#F5F2EB] tracking-tight truncate sm:overflow-visible">
-              Peta Eksplor Selasar
-            </h1>
-            <p className="text-[9px] sm:text-xs font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[#8B6B4F] dark:text-[#C4A876] mt-0.5 truncate">
-              Temukan Spot Produktif di Kotamu
-            </p>
-          </div>
+          ></div>
 
           <div className="w-9 sm:w-10 shrink-0"></div>
-        </div>
-
-        {/* SEARCH BAR */}
-        <div className="flex justify-center mt-3 sm:mt-4">
-          <div className="flex w-full max-w-lg overflow-hidden rounded-full border border-gray-300 dark:border-[#3D342D] bg-white dark:bg-[#2A2521] shadow-md transition-all duration-300 hover:shadow-lg focus-within:ring-2 ring-[#594A42]/20 dark:ring-[#C4A876]/30 h-11 sm:h-13">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCanScrollUp(false);
-                setCanScrollDown(true);
-              }}
-              placeholder="Cari spot cafe, jalan, colokan, atau WiFi..."
-              className="flex-1 px-4 sm:px-6 text-xs sm:text-sm outline-none text-[#594A42] dark:text-[#F5F2EB] bg-transparent placeholder-gray-400 dark:placeholder-gray-500 font-medium min-w-0"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setCanScrollUp(false);
-                  setCanScrollDown(true);
-                }}
-                className="px-2 text-gray-400 hover:text-[#594A42] dark:hover:text-[#F5F2EB] transition-colors shrink-0"
-              >
-                <FaTimes size={12} />
-              </button>
-            )}
-            <div className="px-3.5 sm:px-5 border-l border-gray-200 dark:border-[#3D342D] text-[#594A42] dark:text-[#C4A876] flex items-center justify-center bg-[#E5DFCF]/50 dark:bg-[#332C27] shrink-0">
-              <FaSearch size={14} />
-            </div>
-          </div>
-        </div>
-
-        {/* CITY SELECTOR TABS */}
-        <div className="flex justify-start sm:justify-center items-center gap-2 mt-4 sm:mt-5 overflow-x-auto pb-1 scrollbar-none px-1">
-          {cityFilters.map((city) => {
-            const isActive = activeCity === city;
-            return (
-              <button
-                key={city}
-                onClick={() => {
-                  setActiveCity(city);
-                  setCanScrollUp(false);
-                  setCanScrollDown(true);
-                }}
-                className={`px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 shrink-0 ${
-                  isActive
-                    ? "bg-[#594A42] text-white shadow-md scale-105"
-                    : "bg-white/80 dark:bg-[#2A2521]/80 text-[#594A42] dark:text-[#F5F2EB] border border-gray-200 dark:border-[#3D342D] hover:bg-white dark:hover:bg-[#2A2521]"
-                }`}
-              >
-                {city}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* CATEGORY FILTER BUTTONS */}
-        <div className="flex justify-center gap-1.5 sm:gap-2.5 mt-2.5 sm:mt-3 flex-wrap">
-          {filterCategories.map((cat, index) => {
-            const isActive = activeCategory === cat.label;
-            return (
-              <button
-                key={index}
-                onClick={() => {
-                  setActiveCategory(cat.label);
-                  setCanScrollUp(false);
-                  setCanScrollDown(true);
-                }}
-                className={`
-                  px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 shadow-xs transition-all duration-300 active:scale-95 border cursor-pointer
-                  ${
-                    isActive
-                      ? "bg-[#8B6B4F] text-white shadow-md border-transparent scale-105"
-                      : "bg-white dark:bg-[#2A2521] text-[#594A42] dark:text-[#F5F2EB] border-gray-200 dark:border-[#3D342D] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27]"
-                  }
-                `}
-              >
-                {cat.icon} <span>{cat.label}</span>
-              </button>
-            );
-          })}
         </div>
       </div>
 
       {/* SPLIT LAYOUT: MAP (kiri sticky) + KARTU (kanan scrollable) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12 relative z-10">
-
+      <div className="max-w-7xl mx-auto px-4 -translate-y-8 sm:px-6 pb-12 relative z-10">
         {/* SECTION HEADER - CENTERED */}
-        <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
+        <div className="flex flex-col items-center text-center gap-2 mb-6 sm:mb-8">
           {/* Top decorative line + badge row */}
-          <div className="flex items-center gap-2 sm:gap-4 w-full max-w-2xl mb-4 sm:mb-5">
+          <div className="flex items-center gap-9 sm:gap-4 w-full max-w-2xl mb-4 sm:mb-5">
             <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#C4A876]/40 to-[#8B6B4F]/60 dark:via-[#C4A876]/25 dark:to-[#8B6B4F]/40 hidden sm:block" />
             <div className="flex items-center gap-2 shrink-0 mx-auto sm:mx-0">
               <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#8B6B4F]/10 dark:bg-[#C4A876]/15 text-[#8B6B4F] dark:text-[#C4A876] text-[10px] sm:text-[11px] font-extrabold rounded-full uppercase tracking-widest flex items-center gap-1.5">
@@ -399,14 +328,27 @@ export default function Map() {
           </div>
 
           {/* Main heading */}
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] tracking-tight leading-tight mb-2 sm:mb-3 px-2">
-            {activeCategory === "Semua"
-              ? <>Spot Pilihan di <span className="text-[#8B6B4F] dark:text-[#C4A876]">{activeCity}</span></>
-              : <><span className="text-[#8B6B4F] dark:text-[#C4A876]">{activeCategory}</span> di {activeCity}</>}
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] tracking-tight leading-tight mb-2  sm:mb-3 px-2">
+            {activeCategory === "Semua" ? (
+              <>
+                Spot Pilihan di{" "}
+                <span className="text-[#8B6B4F] dark:text-[#C4A876]">
+                  {activeCity}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[#8B6B4F] dark:text-[#C4A876]">
+                  {activeCategory}
+                </span>{" "}
+                di {activeCity}
+              </>
+            )}
           </h2>
 
           <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm font-medium max-w-md leading-relaxed px-4">
-            Data ketersediaan colokan, kecepatan WiFi, dan suasana diperbarui real-time.
+            Data ketersediaan colokan, kecepatan WiFi, dan suasana diperbarui
+            real-time.
           </p>
 
           {/* Bottom divider */}
@@ -421,7 +363,8 @@ export default function Map() {
               Spot belum ditemukan
             </h3>
             <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm mt-1.5 sm:mt-2 max-w-sm text-center">
-              Coba ganti kata kunci, pilih kategori lain, atau luaskan ke "Semua Kota".
+              Coba ganti kata kunci, pilih kategori lain, atau luaskan ke "Semua
+              Kota".
             </p>
             <button
               onClick={() => {
@@ -439,7 +382,6 @@ export default function Map() {
         ) : (
           /* SPLIT LAYOUT: Peta sticky kiri + Kartu scroll kanan (Responsif) */
           <div className="flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
-
             {/* LEFT: Leaflet Map */}
             <div
               id="selasar-map-section"
@@ -457,13 +399,13 @@ export default function Map() {
 
             {/* RIGHT: Fixed-height card panel — Responsif seimbang */}
             <div className="w-full lg:w-[45%] h-[480px] sm:h-[520px] md:h-[560px] lg:h-[620px] relative rounded-[1.75rem] sm:rounded-[2rem] overflow-hidden">
-
               {/* BUTTON UP (DI ATAS) */}
               <div
-                className={`absolute top-2.5 sm:top-3 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 ${canScrollUp
-                  ? "opacity-100 translate-y-0 pointer-events-auto"
-                  : "opacity-0 -translate-y-2 pointer-events-none"
-                  }`}
+                className={`absolute top-2.5 sm:top-3 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 ${
+                  canScrollUp
+                    ? "opacity-100 translate-y-0 pointer-events-auto"
+                    : "opacity-0 -translate-y-2 pointer-events-none"
+                }`}
               >
                 <button
                   onClick={handleScrollPrev}
@@ -479,22 +421,25 @@ export default function Map() {
 
               {/* FADE GRADIENT ATAS */}
               <div
-                className={`absolute top-0 left-0 right-0 h-12 sm:h-16 bg-gradient-to-b from-[#EDE8DE] dark:from-[#1F1B18] via-[#EDE8DE]/70 dark:via-[#1F1B18]/70 to-transparent z-20 pointer-events-none rounded-t-[1.75rem] sm:rounded-t-[2rem] transition-opacity duration-300 ${canScrollUp ? "opacity-100" : "opacity-0"
-                  }`}
+                className={`absolute top-0 left-0 right-0 h-12 sm:h-16 bg-gradient-to-b from-[#EDE8DE] dark:from-[#1F1B18] via-[#EDE8DE]/70 dark:via-[#1F1B18]/70 to-transparent z-20 pointer-events-none rounded-t-[1.75rem] sm:rounded-t-[2rem] transition-opacity duration-300 ${
+                  canScrollUp ? "opacity-100" : "opacity-0"
+                }`}
               />
 
               {/* FADE GRADIENT BAWAH */}
               <div
-                className={`absolute bottom-0 left-0 right-0 h-12 sm:h-16 bg-gradient-to-t from-[#EDE8DE] dark:from-[#1F1B18] via-[#EDE8DE]/70 dark:via-[#1F1B18]/70 to-transparent z-20 pointer-events-none rounded-b-[1.75rem] sm:rounded-b-[2rem] transition-opacity duration-300 ${canScrollDown ? "opacity-100" : "opacity-0"
-                  }`}
+                className={`absolute bottom-0 left-0 right-0 h-12 sm:h-16 bg-gradient-to-t from-[#EDE8DE] dark:from-[#1F1B18] via-[#EDE8DE]/70 dark:via-[#1F1B18]/70 to-transparent z-20 pointer-events-none rounded-b-[1.75rem] sm:rounded-b-[2rem] transition-opacity duration-300 ${
+                  canScrollDown ? "opacity-100" : "opacity-0"
+                }`}
               />
 
               {/* BUTTON DOWN (DI BAWAH) */}
               <div
-                className={`absolute bottom-2.5 sm:bottom-3 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 ${canScrollDown
-                  ? "opacity-100 translate-y-0 pointer-events-auto"
-                  : "opacity-0 translate-y-2 pointer-events-none"
-                  }`}
+                className={`absolute bottom-2.5 sm:bottom-3 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 ${
+                  canScrollDown
+                    ? "opacity-100 translate-y-0 pointer-events-auto"
+                    : "opacity-0 translate-y-2 pointer-events-none"
+                }`}
               >
                 <button
                   onClick={handleScrollNext}
@@ -525,15 +470,21 @@ export default function Map() {
                         onClick={() => {
                           handleSelectLocation(loc);
                         }}
-                        className={`bg-white dark:bg-[#2A2521] rounded-[1.75rem] sm:rounded-[2rem] shadow-sm hover:shadow-xl overflow-hidden flex flex-col cursor-pointer group transition-all duration-300 ease-out hover:-translate-y-1 border ${isSelected
-                          ? "ring-3 ring-[#8B6B4F] border-transparent shadow-lg scale-[1.01]"
-                          : "border-gray-100 dark:border-[#3D342D]"
-                          }`}
+                        className={`bg-white dark:bg-[#2A2521] rounded-[1.75rem] sm:rounded-[2rem] shadow-sm hover:shadow-xl overflow-hidden flex flex-col cursor-pointer group transition-all duration-300 ease-out hover:-translate-y-1 border ${
+                          isSelected
+                            ? "ring-3 ring-[#8B6B4F] border-transparent shadow-lg scale-[1.01]"
+                            : "border-gray-100 dark:border-[#3D342D]"
+                        }`}
                       >
-                        <div className="h-44 sm:h-48 overflow-hidden relative">
+                        <div className="h-44 sm:h-48 overflow-hidden relative bg-[#EBE7DF] dark:bg-[#3D342D]">
                           <img
-                            src={loc.image}
+                            src={loc.image || FALLBACK_PLACE_IMG}
                             alt={loc.name}
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = FALLBACK_PLACE_IMG;
+                            }}
                             className="w-full h-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-110"
                           />
                           <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 bg-white/95 dark:bg-[#2A2521]/95 backdrop-blur-sm px-2.5 sm:px-3.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold text-[#594A42] dark:text-[#F5F2EB] shadow-sm uppercase tracking-wider">
@@ -548,17 +499,6 @@ export default function Map() {
                           <div className="absolute bottom-2.5 left-3.5 sm:bottom-3 sm:left-4 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#594A42]/80 backdrop-blur-sm flex items-center justify-center text-white text-[10px] sm:text-[11px] font-extrabold shadow-md">
                             {idx + 1}
                           </div>
-
-                          <button
-                            onClick={(e) => handleToggleFavoriteDetail(e, loc)}
-                            aria-label="Simpan Favorit"
-                            className={`absolute bottom-2.5 right-3.5 sm:bottom-3 sm:right-4 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-md backdrop-blur-sm transition-all duration-300 active:scale-90 ${favoriteIds.has(loc.id)
-                              ? "bg-[#8B6B4F] text-white"
-                              : "bg-white/90 dark:bg-[#2A2521]/90 text-gray-400 hover:text-[#8B6B4F] dark:hover:text-[#C4A876]"
-                              }`}
-                          >
-                            <FaBookmark size={12} />
-                          </button>
                         </div>
 
                         <div className="p-4 sm:p-5 flex flex-col flex-1">
@@ -569,7 +509,9 @@ export default function Map() {
                               </h3>
                               <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-medium truncate">
                                 <FaMapMarkerAlt className="text-[#8B6B4F] dark:text-[#C4A876] shrink-0" />
-                                <span className="truncate">{loc.distance} dari pusat</span>
+                                <span className="truncate">
+                                  {loc.distance} dari pusat
+                                </span>
                               </div>
                             </div>
                             <div className="bg-[#EFE7E2] dark:bg-[#1F1B18] text-[#594A42] dark:text-[#C4A876] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl text-[10px] sm:text-xs font-extrabold whitespace-nowrap shrink-0">
@@ -584,7 +526,8 @@ export default function Map() {
                           <div className="mt-auto pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-[#3D342D] grid grid-cols-2 gap-2 text-[11px] sm:text-xs text-[#594A42] dark:text-[#F5F2EB]">
                             <div className="bg-gray-50 dark:bg-[#1F1B18] p-2 sm:p-2.5 rounded-xl">
                               <p className="flex items-center gap-1 sm:gap-1.5 mb-0.5 text-gray-400 dark:text-gray-500 font-bold text-[10px] sm:text-xs">
-                                <FaPlug className="text-[#8B6B4F] shrink-0" /> Colokan
+                                <FaPlug className="text-[#8B6B4F] shrink-0" />{" "}
+                                Colokan
                               </p>
                               <p className="font-bold text-emerald-700 dark:text-emerald-400 truncate">
                                 {loc.colokanProbability}
@@ -592,9 +535,12 @@ export default function Map() {
                             </div>
                             <div className="bg-gray-50 dark:bg-[#1F1B18] p-2 sm:p-2.5 rounded-xl">
                               <p className="flex items-center gap-1 sm:gap-1.5 mb-0.5 text-gray-400 dark:text-gray-500 font-bold text-[10px] sm:text-xs">
-                                <FaWifi className="text-[#8B6B4F] shrink-0" /> WiFi
+                                <FaWifi className="text-[#8B6B4F] shrink-0" />{" "}
+                                WiFi
                               </p>
-                              <p className="font-bold truncate">{loc.wifiStatus}</p>
+                              <p className="font-bold truncate">
+                                {loc.wifiStatus}
+                              </p>
                             </div>
                           </div>
 
@@ -606,7 +552,10 @@ export default function Map() {
                               }}
                               className="flex-1 py-2 px-2 sm:px-3 bg-[#E5DFCF] dark:bg-[#332C27] hover:bg-[#d5cebd] dark:hover:bg-[#433731] text-[#594A42] dark:text-[#F5F2EB] rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
                             >
-                              <FaCompass size={11} className="text-[#8B6B4F] dark:text-[#C4A876] shrink-0" />
+                              <FaCompass
+                                size={11}
+                                className="text-[#8B6B4F] dark:text-[#C4A876] shrink-0"
+                              />
                               <span>Fokus di Peta</span>
                             </button>
 
@@ -649,10 +598,14 @@ export default function Map() {
               <FaTimes size={15} />
             </button>
 
-            <div className="w-full md:w-[45%] h-[180px] sm:h-[220px] md:h-auto overflow-hidden relative shrink-0">
+            <div className="w-full md:w-[45%] h-[180px] sm:h-[220px] md:h-auto overflow-hidden relative shrink-0 bg-[#EBE7DF] dark:bg-[#3D342D]">
               <img
-                src={selectedLocation.image}
+                src={selectedLocation.image || FALLBACK_PLACE_IMG}
                 alt={selectedLocation.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = FALLBACK_PLACE_IMG;
+                }}
                 className="w-full h-full object-cover"
               />
               <div className="absolute top-3 left-3 sm:top-4 sm:left-4 flex gap-1.5 sm:gap-2">
@@ -679,50 +632,95 @@ export default function Map() {
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed mt-3 sm:mt-4 mb-4 sm:mb-6">
-                  {selectedLocation.description}
-                </p>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3 md:gap-4 text-xs sm:text-sm text-[#594A42] dark:text-[#F5F2EB]">
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl">
-                    <p className="font-bold flex items-center gap-1 sm:gap-1.5 mb-1 text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs">
-                      <FaPlug className="text-[#8B6B4F]" /> Colokan
-                    </p>
-                    <p className="font-bold text-emerald-700 dark:text-emerald-400">
-                      {selectedLocation.colokanProbability}
-                    </p>
-                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
-                      {selectedLocation.specs?.plug || "Tersedia"}
-                    </p>
-                  </div>
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl">
-                    <p className="font-bold flex items-center gap-1 sm:gap-1.5 mb-1 text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs">
-                      <FaWifi className="text-[#8B6B4F]" /> WiFi
-                    </p>
-                    <p className="font-bold truncate">{selectedLocation.wifiStatus}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
-                      {selectedLocation.specs?.wifi || "Stabil"}
-                    </p>
-                  </div>
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl col-span-2 md:col-span-1">
-                    <p className="font-bold flex items-center gap-1 sm:gap-1.5 mb-1 text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs">
-                      <FaUsers className="text-[#8B6B4F]" /> Suasana
-                    </p>
-                    <p className="font-bold">{selectedLocation.noiseLevel}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">
-                      {selectedLocation.visitors} Orang di spot
-                    </p>
-                  </div>
+                {/* Tab Navigation */}
+                <div className="flex items-center gap-4 mt-3 mb-4 border-b border-gray-100 dark:border-[#3D342D] pb-2 text-xs sm:text-sm">
+                  <button
+                    onClick={() => setModalTab("info")}
+                    className={`pb-1 font-bold transition-all cursor-pointer ${
+                      modalTab === "info"
+                        ? "text-[#8B6B4F] dark:text-[#C4A876] border-b-2 border-[#8B6B4F] dark:border-[#C4A876]"
+                        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Ringkasan Tempat
+                  </button>
+                  <button
+                    onClick={() => setModalTab("reviews")}
+                    className={`pb-1 font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      modalTab === "reviews"
+                        ? "text-[#8B6B4F] dark:text-[#C4A876] border-b-2 border-[#8B6B4F] dark:border-[#C4A876]"
+                        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    <span>Ulasan Komunitas</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[#8B6B4F]/10 text-[#8B6B4F] dark:bg-[#C4A876]/20 dark:text-[#C4A876]">
+                      WFC
+                    </span>
+                  </button>
                 </div>
+
+                {modalTab === "info" ? (
+                  <>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-4 sm:mb-6">
+                      {selectedLocation.description}
+                    </p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3 md:gap-4 text-xs sm:text-sm text-[#594A42] dark:text-[#F5F2EB]">
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl">
+                        <p className="font-bold flex items-center gap-1 sm:gap-1.5 mb-1 text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs">
+                          <FaPlug className="text-[#8B6B4F]" /> Colokan
+                        </p>
+                        <p className="font-bold text-emerald-700 dark:text-emerald-400">
+                          {selectedLocation.colokanProbability}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                          {selectedLocation.specs?.plug || "Tersedia"}
+                        </p>
+                      </div>
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl">
+                        <p className="font-bold flex items-center gap-1 sm:gap-1.5 mb-1 text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs">
+                          <FaWifi className="text-[#8B6B4F]" /> WiFi
+                        </p>
+                        <p className="font-bold truncate">
+                          {selectedLocation.wifiStatus}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                          {selectedLocation.specs?.wifi || "Stabil"}
+                        </p>
+                      </div>
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl col-span-2 md:col-span-1">
+                        <p className="font-bold flex items-center gap-1 sm:gap-1.5 mb-1 text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs">
+                          <FaUsers className="text-[#8B6B4F]" /> Suasana
+                        </p>
+                        <p className="font-bold">
+                          {selectedLocation.noiseLevel}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {selectedLocation.visitors} Orang di spot
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <CommunityReviewsSection
+                    placeId={selectedLocation.id}
+                    placeName={selectedLocation.name}
+                    currentUser={currentUser}
+                    onOpenWriteReview={() => setIsReviewFormOpen(true)}
+                    refreshTrigger={reviewRefreshTrigger}
+                  />
+                )}
               </div>
 
               <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
-                <button
-                  onClick={() => handleOpenRoute(selectedLocation)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 sm:px-8 py-3 sm:py-3.5 bg-[#594A42] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg cursor-pointer"
-                >
-                  <FaLocationArrow /> Rute ke Sini (Google Maps)
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => handleOpenRoute(selectedLocation)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-[#594A42] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg cursor-pointer"
+                  >
+                    <FaLocationArrow /> Rute (Google Maps)
+                  </button>
+                </div>
                 <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-end">
                   <button
                     onClick={(e) =>
@@ -733,10 +731,11 @@ export default function Map() {
                         ? "Hapus dari favorit"
                         : "Simpan ke favorit"
                     }
-                    className={`p-3 sm:p-3.5 rounded-full transition-all hover:scale-110 active:scale-95 cursor-pointer ${favoriteIds.has(selectedLocation.id)
-                      ? "bg-[#8B6B4F] text-white"
-                      : "bg-gray-100 dark:bg-[#1F1B18] text-gray-400 dark:text-gray-500 hover:text-[#8B6B4F]"
-                      }`}
+                    className={`p-3 sm:p-3.5 rounded-full transition-all hover:scale-110 active:scale-95 cursor-pointer ${
+                      favoriteIds.has(selectedLocation.id)
+                        ? "bg-[#8B6B4F] text-white"
+                        : "bg-gray-100 dark:bg-[#1F1B18] text-gray-400 dark:text-gray-500 hover:text-[#8B6B4F]"
+                    }`}
                   >
                     <FaBookmark size={16} />
                   </button>
@@ -748,6 +747,20 @@ export default function Map() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Community Review Form Modal */}
+      {isReviewFormOpen && selectedLocation && (
+        <CommunityReviewModal
+          isOpen={isReviewFormOpen}
+          onClose={() => setIsReviewFormOpen(false)}
+          place={selectedLocation}
+          currentUser={currentUser}
+          onSuccess={() => {
+            setReviewRefreshTrigger((prev) => prev + 1);
+            setModalTab("reviews");
+          }}
+        />
       )}
     </div>
   );

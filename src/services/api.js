@@ -221,15 +221,19 @@ export async function toggleBookmarkAPI(firebaseUid, placeId, note = null) {
 }
 
 // ============================================================
-//  REVIEWS API
+//  REVIEWS API (COMMUNITY REVIEWS)
 // ============================================================
 
-export async function fetchPlaceReviews(placeId, sort = 'latest') {
+export async function fetchPlaceReviews(placeId, sort = 'latest', userIdOrUid = null) {
   try {
-    const res = await fetchAPI(`/api/reviews/place/${placeId}?sort=${sort}`);
+    let queryParam = `?sort=${sort}`;
+    if (userIdOrUid) {
+      queryParam += `&user_id=${encodeURIComponent(userIdOrUid)}&firebase_uid=${encodeURIComponent(userIdOrUid)}`;
+    }
+    const res = await fetchAPI(`/api/reviews/place/${placeId}${queryParam}`);
     return res;
   } catch (err) {
-    return { success: false, data: [], summary: null };
+    return { success: false, data: [], summary: null, community_insights: null };
   }
 }
 
@@ -240,10 +244,13 @@ export async function submitPlaceReview(reviewData) {
   });
 }
 
-export async function toggleReviewHelpfulAPI(reviewId, firebaseUid) {
+export async function toggleReviewHelpfulAPI(reviewId, userIdOrUid) {
   return await fetchAPI(`/api/reviews/${reviewId}/helpful`, {
     method: 'POST',
-    body: JSON.stringify({ firebase_uid: firebaseUid }),
+    body: JSON.stringify({ 
+      user_id: userIdOrUid,
+      firebase_uid: userIdOrUid 
+    }),
   });
 }
 

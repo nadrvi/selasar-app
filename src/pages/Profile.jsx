@@ -21,6 +21,9 @@ import {
   toggleFavorite as toggleFavoriteStore,
 } from "../utils/activityStore";
 
+const FALLBACK_PLACE_IMG =
+  "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
+
 const preferenceIcons = {
   colokan: <FaPlug size={18} />,
   wifi: <FaWifi size={18} />,
@@ -356,8 +359,12 @@ export default function Profile() {
                   className="flex items-center gap-4 bg-[#F3EFEA] dark:bg-[#1F1B18] rounded-2xl p-3 sm:p-4 cursor-pointer hover:ring-2 hover:ring-[#8B7365]/40 active:scale-[0.99] transition-all"
                 >
                   <img
-                    src={item.image}
+                    src={item.image || FALLBACK_PLACE_IMG}
                     alt={item.name}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = FALLBACK_PLACE_IMG;
+                    }}
                     className="w-20 h-16 sm:w-24 sm:h-16 rounded-xl object-cover shrink-0"
                   />
                   <div className="flex-1 min-w-0">
@@ -478,8 +485,12 @@ export default function Profile() {
               <FaTimes size={14} />
             </button>
             <img
-              src={activeActivity.image}
+              src={activeActivity.image || FALLBACK_PLACE_IMG}
               alt={activeActivity.name}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = FALLBACK_PLACE_IMG;
+              }}
               className="w-full h-48 object-cover"
             />
             <div className="p-6">

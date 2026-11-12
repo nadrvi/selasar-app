@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   signInWithPopup,
@@ -30,9 +30,7 @@ import {
   Sun,
   Moon,
   Smartphone,
-  Lock,
   ShieldAlert,
-  ArrowRight,
 } from "lucide-react";
 
 // STORAGE KEYS FOR PERSISTENT BRUTE-FORCE DEFENSE
@@ -58,7 +56,11 @@ export default function Login() {
 
   // Security Anti-Bot Honeypot & Timing
   const [honeypot, setHoneypot] = useState("");
-  const formMountTime = useRef(Date.now());
+  const formMountTime = useRef(0);
+
+  useEffect(() => {
+    formMountTime.current = Date.now();
+  }, []);
 
   // Modal State Reset Password
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -125,6 +127,11 @@ export default function Login() {
     return () => clearInterval(interval);
   }, [lockoutTimer]);
 
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => navigate("/"), 350);
+  });
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
@@ -137,18 +144,13 @@ export default function Login() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isResetModalOpen]);
+  }, [isResetModalOpen, handleClose]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (errors[e.target.name] || errors.general) {
       setErrors({ ...errors, [e.target.name]: "", general: "" });
     }
-  };
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => navigate("/"), 350);
   };
 
   const handleLogin = async (e) => {
@@ -204,7 +206,10 @@ export default function Login() {
       });
 
       const dbUser = dbResponse.data;
-      console.log("Login sukses terverifikasi dari PostgreSQL selasar-db:", dbUser);
+      console.log(
+        "Login sukses terverifikasi dari PostgreSQL selasar-db:",
+        dbUser,
+      );
 
       // 2. Hubungkan ke Firebase Auth (opsional/hybrid)
       let fbToken = null;
@@ -279,12 +284,18 @@ export default function Login() {
         });
       } else {
         const errMsg = error.message || "";
-        if (errMsg.includes("tidak cocok") || errMsg.includes("belum terdaftar")) {
+        if (
+          errMsg.includes("tidak cocok") ||
+          errMsg.includes("belum terdaftar")
+        ) {
           setErrors({
             password: `Email atau password salah. (Sisa percobaan sebelum terkunci: ${3 - nextAttempts})`,
           });
         } else {
-          setErrors({ general: errMsg || "Gagal masuk ke sistem database. Cek koneksi backend." });
+          setErrors({
+            general:
+              errMsg || "Gagal masuk ke sistem database. Cek koneksi backend.",
+          });
         }
       }
     } finally {

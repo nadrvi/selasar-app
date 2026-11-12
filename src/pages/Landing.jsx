@@ -23,6 +23,9 @@ import {
   FaClock,
 } from "react-icons/fa";
 
+const FALLBACK_PLACE_IMG =
+  "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
+
 const features = [
   {
     icon: FaPlug,
@@ -548,10 +551,15 @@ export default function Landing() {
             {previewPlaces.map((place, i) => (
               <RevealOnScroll key={place.id} delay={i * 100}>
                 <div className="bg-white/80 dark:bg-[#2A2521]/80 backdrop-blur-sm rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 overflow-hidden border border-white dark:border-[#3D342D] group cursor-pointer flex flex-col h-full">
-                  <div className="h-56 overflow-hidden relative">
+                  <div className="h-56 overflow-hidden relative bg-[#EBE7DF] dark:bg-[#3D342D]">
                     <img
-                      src={place.image}
+                      src={place.image || FALLBACK_PLACE_IMG}
                       alt={place.name}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = FALLBACK_PLACE_IMG;
+                      }}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />

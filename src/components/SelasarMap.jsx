@@ -375,8 +375,12 @@ export default function SelasarMap({
             </button>
 
             <img
-              src={activeSpot.image}
+              src={activeSpot.image || "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80"}
               alt={activeSpot.name}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
+              }}
               className="w-14 h-14 rounded-xl object-cover shrink-0"
             />
 

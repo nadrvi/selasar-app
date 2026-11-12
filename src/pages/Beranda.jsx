@@ -18,9 +18,14 @@ import {
   FaLocationArrow,
   FaTag,
   FaCog,
-  FaFilter,
   FaSearch,
+  FaPen,
 } from "react-icons/fa";
+import CommunityReviewModal from "../components/CommunityReviewModal";
+import CommunityReviewsSection from "../components/CommunityReviewsSection";
+
+const FALLBACK_PLACE_IMG =
+  "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
 
 const banners = [
   {
@@ -109,7 +114,7 @@ function RevealOnScroll({ children, delay = 0 }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const observer = new IntersectionObserver(  
+    const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setVisible(true);
@@ -150,6 +155,17 @@ export default function Beranda() {
   const [placesList, setPlacesList] = useState(placesData);
   const [promoList, setPromoList] = useState(banners);
 
+  const [placeModalTab, setPlaceModalTab] = useState("info"); // "info" | "reviews"
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [reviewRefreshTrigger, setReviewRefreshTrigger] = useState(0);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("selasarUser") || "null");
+    } catch {
+      return null;
+    }
+  });
+
   useEffect(() => {
     let isMounted = true;
     fetchPlaces().then((data) => {
@@ -167,7 +183,7 @@ export default function Beranda() {
             detail: p.detail,
             image: p.image_url || banners[idx % banners.length]?.image,
             brand: p.brand_name || p.place_name || "Selasar",
-          }))
+          })),
         );
       }
     });
@@ -350,6 +366,12 @@ export default function Beranda() {
       subtitle: place.city,
       match: place.match,
     });
+    try {
+      setCurrentUser(JSON.parse(localStorage.getItem("selasarUser") || "null"));
+    } catch {
+      /* ignore */
+    }
+    setPlaceModalTab("info");
     setSelectedPlace(place);
   };
 
@@ -429,7 +451,9 @@ export default function Beranda() {
       <div className="relative z-10">
         <nav
           className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-300 ease-out ${
-            isTransitioning ? "opacity-0 -translate-y-2 pointer-events-none" : "opacity-100 translate-y-0"
+            isTransitioning
+              ? "opacity-0 -translate-y-2 pointer-events-none"
+              : "opacity-100 translate-y-0"
           }`}
         >
           <div className="w-[76px]"></div>
@@ -456,7 +480,9 @@ export default function Beranda() {
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex flex-col items-center">
           <div
             className={`text-center mb-6 transition-all duration-300 ease-out ${
-              isTransitioning ? "opacity-0 -translate-y-2 pointer-events-none" : "opacity-100 translate-y-0"
+              isTransitioning
+                ? "opacity-0 -translate-y-2 pointer-events-none"
+                : "opacity-100 translate-y-0"
             }`}
           >
             <p className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold uppercase tracking-[0.2em] mb-2">
@@ -492,7 +518,9 @@ export default function Beranda() {
 
           <div
             className={`w-full mt-8 mb-2 transition-all duration-300 ease-out ${
-              isTransitioning ? "opacity-0 -translate-y-1 pointer-events-none" : "opacity-100 translate-y-0"
+              isTransitioning
+                ? "opacity-0 -translate-y-1 pointer-events-none"
+                : "opacity-100 translate-y-0"
             }`}
           >
             <div
@@ -515,8 +543,12 @@ export default function Beranda() {
                   className="min-w-[85%] sm:min-w-[70%] md:min-w-[45%] lg:min-w-[40%] relative h-48 md:h-52 rounded-3xl overflow-hidden shadow-md group shrink-0"
                 >
                   <img
-                    src={banner.image}
+                    src={banner.image || FALLBACK_PLACE_IMG}
                     alt={banner.title}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = FALLBACK_PLACE_IMG;
+                    }}
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 pointer-events-none"
                     draggable="false"
                   />
@@ -590,11 +622,20 @@ export default function Beranda() {
             {/* Quick Search Tag Pills */}
             <div
               className={`flex flex-wrap items-center justify-center gap-2 mt-3.5 text-xs font-semibold text-[#8B6B4F] dark:text-[#C4A876] transition-all duration-300 ${
-                isTransitioning ? "opacity-0 -translate-y-1 pointer-events-none" : "opacity-100 translate-y-0"
+                isTransitioning
+                  ? "opacity-0 -translate-y-1 pointer-events-none"
+                  : "opacity-100 translate-y-0"
               }`}
             >
-              <span className="text-gray-400 dark:text-gray-500 font-medium">Populer:</span>
-              {["Stopkontak Banyak", "WiFi Ngebut", "Tenang", "Buka 24 Jam"].map((tag) => (
+              <span className="text-gray-400 dark:text-gray-500 font-medium">
+                Populer:
+              </span>
+              {[
+                "Stopkontak Banyak",
+                "WiFi Ngebut",
+                "Tenang",
+                "Buka 24 Jam",
+              ].map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -604,82 +645,6 @@ export default function Beranda() {
                   {tag}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* MENU FILTER EXPANDABLE */}
-          <div
-            className={`flex justify-center items-center mt-8 mb-6 transition-all duration-300 ease-out ${
-              isTransitioning
-                ? "opacity-0 translate-y-2 pointer-events-none"
-                : "opacity-100 translate-y-0"
-            }`}
-          >
-            <div className="flex items-center bg-[#fdfcfa] dark:bg-[#2A2521] rounded-full shadow-md border border-gray-200 dark:border-[#3D342D] p-1.5 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] hover:shadow-lg">
-              <button
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`shrink-0 flex items-center justify-center gap-2 h-11 px-6 rounded-full font-bold text-sm shadow-sm transition-all duration-300 active:scale-95 z-10 ${
-                  isFilterOpen
-                    ? "bg-[#EFE7E2] dark:bg-[#3D342D] text-[#594A42] dark:text-[#F5F2EB] hover:bg-[#EBE7DF] dark:hover:bg-[#453a32]"
-                    : "bg-[#594A42] text-white hover:bg-[#433731]"
-                }`}
-              >
-                {isFilterOpen ? <FaTimes size={12} /> : <FaFilter size={12} />}
-                <span className="w-[38px] text-left">
-                  {isFilterOpen ? "Tutup" : "Filter"}
-                </span>
-              </button>
-
-              <div
-                className={`grid transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                  isFilterOpen
-                    ? "grid-cols-[1fr] opacity-100 ml-2"
-                    : "grid-cols-[0fr] opacity-0 ml-0"
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <div className="flex items-center gap-2 w-max pr-1">
-                    <button
-                      onClick={() => setActiveFilter("Show Everything")}
-                      className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 active:scale-95 ${
-                        activeFilter === "Show Everything"
-                          ? "bg-[#594A42] text-white shadow-md"
-                          : "bg-transparent text-[#594A42] dark:text-[#C4A876] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27]"
-                      }`}
-                    >
-                      Show Everything
-                    </button>
-
-                    {["Jakarta", "Bogor", "Bandung"].map((city) => (
-                      <button
-                        key={city}
-                        onClick={() => setActiveFilter(city)}
-                        className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 active:scale-95 border ${
-                          activeFilter === city
-                            ? "bg-[#594A42] text-white border-transparent shadow-md"
-                            : "bg-transparent text-[#594A42] dark:text-[#C4A876] border-gray-300 dark:border-[#3D342D] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27] hover:border-[#594A42] dark:hover:border-[#C4A876]"
-                        }`}
-                      >
-                        {city}
-                      </button>
-                    ))}
-
-                    <div className="w-px h-6 bg-gray-300 dark:bg-[#3D342D] mx-1 shrink-0" />
-
-                    <button
-                      onClick={() => setShowFavoritesOnly((v) => !v)}
-                      className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 active:scale-95 border flex items-center gap-2 ${
-                        showFavoritesOnly
-                          ? "bg-[#8B6B4F] text-white border-transparent shadow-md"
-                          : "bg-transparent text-[#8B6B4F] dark:text-[#C4A876] border-gray-300 dark:border-[#3D342D] hover:bg-[#F5F2EB] dark:hover:bg-[#332C27] hover:border-[#8B6B4F] dark:hover:border-[#C4A876]"
-                      }`}
-                    >
-                      <FaBookmark size={12} />
-                      Favorit{favorites.size > 0 ? ` (${favorites.size})` : ""}
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </main>
@@ -708,34 +673,19 @@ export default function Beranda() {
                     onClick={() => handleSelectPlace(place)}
                     className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden border border-gray-100 dark:border-[#3D342D] flex flex-col cursor-pointer group"
                   >
-                    <div className="h-48 overflow-hidden relative">
+                    <div className="h-48 overflow-hidden relative bg-[#EBE7DF] dark:bg-[#3D342D]">
                       <img
-                        src={place.image}
+                        src={place.image || FALLBACK_PLACE_IMG}
                         alt={place.name}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = FALLBACK_PLACE_IMG;
+                        }}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                       <div className="absolute top-4 left-4 bg-white/90 dark:bg-[#2A2521]/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-[#594A42] dark:text-[#F5F2EB] shadow-sm uppercase tracking-wider">
                         {place.city}
-                      </div>
-
-                      <button
-                        onClick={(e) => toggleFavorite(e, place.id)}
-                        aria-label={
-                          favorites.has(place.id)
-                            ? "Hapus dari favorit"
-                            : "Simpan ke favorit"
-                        }
-                        className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center shadow-sm backdrop-blur-sm transition-all duration-300 active:scale-90 ${
-                          favorites.has(place.id)
-                            ? "bg-[#8B6B4F] text-white"
-                            : "bg-white/90 dark:bg-[#2A2521]/90 text-gray-400 dark:text-gray-400 hover:text-[#8B6B4F] dark:hover:text-[#C4A876]"
-                        }`}
-                      >
-                        <FaBookmark size={13} />
-                      </button>
-
-                      <div className="absolute top-14 right-4 bg-white/90 dark:bg-[#2A2521]/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-green-800 dark:text-green-400 flex items-center gap-1 shadow-sm">
-                        🔌 {place.colokanProbability}
                       </div>
                     </div>
                     <div className="p-6 flex flex-col flex-1">
@@ -748,9 +698,6 @@ export default function Beranda() {
                             {place.overthinkingStatus}
                           </p>
                         </div>
-                        <span className="bg-[#EBE7DF] dark:bg-[#1F1B18] text-[#594A42] dark:text-[#C4A876] text-xs px-2.5 py-1.5 rounded-lg font-bold shadow-sm whitespace-nowrap">
-                          {place.mood}
-                        </span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-gray-600 dark:text-gray-300 mt-auto bg-gray-50 dark:bg-[#1F1B18] p-4 rounded-2xl group-hover:bg-[#F5F2EB] dark:group-hover:bg-[#332C27] transition-colors">
@@ -810,74 +757,130 @@ export default function Beranda() {
           onClick={() => setSelectedPlace(null)}
         >
           <div
-            className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full max-w-4xl animate-scale-in relative"
+            className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] animate-scale-in relative border border-gray-100 dark:border-[#3D342D]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setSelectedPlace(null)}
-              className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/80 dark:bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-[#EFE7E2] dark:hover:bg-[#3D342D] hover:text-[#8B6B4F] dark:hover:text-[#C4A876] hover:rotate-90 transition-all duration-300 shadow-sm"
+              className="absolute top-4 right-4 z-20 w-10 h-10 bg-white/80 dark:bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-[#EFE7E2] dark:hover:bg-[#3D342D] hover:text-[#8B6B4F] dark:hover:text-[#C4A876] hover:rotate-90 transition-all duration-300 shadow-sm cursor-pointer"
             >
               <FaTimes size={18} />
             </button>
-            <div className="w-full md:w-[45%] h-[250px] md:h-auto overflow-hidden relative">
+            <div className="w-full md:w-[42%] h-[200px] sm:h-[240px] md:h-auto overflow-hidden relative shrink-0 bg-[#EBE7DF] dark:bg-[#3D342D]">
               <img
-                src={selectedPlace.image}
+                src={selectedPlace.image || FALLBACK_PLACE_IMG}
                 alt={selectedPlace.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = FALLBACK_PLACE_IMG;
+                }}
                 className="w-full h-full object-cover"
               />
+              <div className="absolute top-4 left-4 flex gap-2">
+                <span className="px-3 py-1 bg-white/90 dark:bg-[#2A2521]/90 backdrop-blur-sm text-[#594A42] dark:text-[#F5F2EB] font-bold text-xs rounded-lg shadow-sm uppercase">
+                  {selectedPlace.city}
+                </span>
+                <span className="px-3 py-1 bg-emerald-500 text-white font-bold text-xs rounded-lg shadow-sm">
+                  {selectedPlace.category}
+                </span>
+              </div>
             </div>
-            <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
+            <div className="flex-1 p-6 md:p-8 flex flex-col justify-between overflow-y-auto">
               <div>
                 <div className="flex items-start justify-between gap-3 mb-1">
-                  <h2 className="text-3xl font-bold text-[#5E4B45] dark:text-[#F5F2EB]">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-[#5E4B45] dark:text-[#F5F2EB]">
                     {selectedPlace.name}
                   </h2>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 font-medium mb-4">
+                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 font-medium mb-3">
                   {selectedPlace.overthinkingStatus}
                 </div>
 
-                {selectedPlace.description && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
-                    {selectedPlace.description}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 md:gap-5 mt-4 text-sm text-[#5E4B45] dark:text-[#F5F2EB]">
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
-                      <FaPlug className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
-                      Colokan
-                    </p>
-                    <p className="font-semibold">
-                      {selectedPlace.colokanProbability}
-                    </p>
-                  </div>
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
-                      <FaWifi className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
-                      WiFi
-                    </p>
-                    <p className="font-semibold">{selectedPlace.wifiStatus}</p>
-                  </div>
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
-                      🔊 Suasana
-                    </p>
-                    <p className="font-semibold">{selectedPlace.noiseLevel}</p>
-                  </div>
-                  <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-4 rounded-2xl">
-                    <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
-                      <FaUsers className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
-                      Kepadatan
-                    </p>
-                    <p className="font-semibold">
-                      {selectedPlace.visitors} Orang
-                    </p>
-                  </div>
+                {/* Tab Navigation */}
+                <div className="flex items-center gap-4 mb-4 border-b border-gray-100 dark:border-[#3D342D] pb-2 text-xs sm:text-sm">
+                  <button
+                    onClick={() => setPlaceModalTab("info")}
+                    className={`pb-1 font-bold transition-all cursor-pointer ${
+                      placeModalTab === "info"
+                        ? "text-[#8B6B4F] dark:text-[#C4A876] border-b-2 border-[#8B6B4F] dark:border-[#C4A876]"
+                        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Ringkasan Tempat
+                  </button>
+                  <button
+                    onClick={() => setPlaceModalTab("reviews")}
+                    className={`pb-1 font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      placeModalTab === "reviews"
+                        ? "text-[#8B6B4F] dark:text-[#C4A876] border-b-2 border-[#8B6B4F] dark:border-[#C4A876]"
+                        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    <span>Ulasan Komunitas</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[#8B6B4F]/10 text-[#8B6B4F] dark:bg-[#C4A876]/20 dark:text-[#C4A876]">
+                      WFC
+                    </span>
+                  </button>
                 </div>
+
+                {placeModalTab === "info" ? (
+                  <>
+                    {selectedPlace.description && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
+                        {selectedPlace.description}
+                      </p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-4 text-sm text-[#5E4B45] dark:text-[#F5F2EB]">
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-3.5 sm:p-4 rounded-2xl">
+                        <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                          <FaPlug className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
+                          Colokan
+                        </p>
+                        <p className="font-semibold text-xs sm:text-sm">
+                          {selectedPlace.colokanProbability}
+                        </p>
+                      </div>
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-3.5 sm:p-4 rounded-2xl">
+                        <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                          <FaWifi className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
+                          WiFi
+                        </p>
+                        <p className="font-semibold text-xs sm:text-sm">
+                          {selectedPlace.wifiStatus}
+                        </p>
+                      </div>
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-3.5 sm:p-4 rounded-2xl">
+                        <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                          🔊 Suasana
+                        </p>
+                        <p className="font-semibold text-xs sm:text-sm">
+                          {selectedPlace.noiseLevel}
+                        </p>
+                      </div>
+                      <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-3.5 sm:p-4 rounded-2xl">
+                        <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                          <FaUsers className="text-[#8B6B4F] dark:text-[#C4A876]" />{" "}
+                          Kepadatan
+                        </p>
+                        <p className="font-semibold text-xs sm:text-sm">
+                          {selectedPlace.visitors} Orang
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <CommunityReviewsSection
+                    placeId={selectedPlace.id}
+                    placeName={selectedPlace.name}
+                    currentUser={currentUser}
+                    onOpenWriteReview={() => setIsReviewFormOpen(true)}
+                    refreshTrigger={reviewRefreshTrigger}
+                  />
+                )}
               </div>
-              <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-4">
+
+              <div className="mt-6 pt-5 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-3">
                 <button
                   onClick={() => {
                     if (selectedPlace?.lat && selectedPlace?.lng) {
@@ -894,7 +897,7 @@ export default function Beranda() {
                       );
                     }
                   }}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg cursor-pointer text-xs sm:text-sm"
                 >
                   <FaLocationArrow /> Rute ke Sini
                 </button>
@@ -902,6 +905,20 @@ export default function Beranda() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Community Review Form Modal */}
+      {isReviewFormOpen && selectedPlace && (
+        <CommunityReviewModal
+          isOpen={isReviewFormOpen}
+          onClose={() => setIsReviewFormOpen(false)}
+          place={selectedPlace}
+          currentUser={currentUser}
+          onSuccess={() => {
+            setReviewRefreshTrigger((prev) => prev + 1);
+            setPlaceModalTab("reviews");
+          }}
+        />
       )}
 
       {selectedBanner && (
@@ -919,10 +936,14 @@ export default function Beranda() {
             >
               <FaTimes size={18} />
             </button>
-            <div className="w-full h-56 sm:h-64 overflow-hidden relative">
+            <div className="w-full h-56 sm:h-64 overflow-hidden relative bg-[#EBE7DF] dark:bg-[#3D342D]">
               <img
-                src={selectedBanner.image}
+                src={selectedBanner.image || FALLBACK_PLACE_IMG}
                 alt={selectedBanner.title}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = FALLBACK_PLACE_IMG;
+                }}
                 className="w-full h-full object-cover"
               />
               <div className="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/60 to-transparent"></div>

@@ -3,12 +3,14 @@ import { query } from '../config/db.js';
 
 export const placesRouter = new Hono();
 
+export const DEFAULT_PLACE_IMAGE = 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80';
+
 /**
  * Format database row to be 100% compatible with Selasar React Frontend
  */
 export const formatPlaceForClient = (p) => {
   const images = Array.isArray(p.images) ? p.images : [];
-  const primaryImg = p.image_url || images.find((img) => img.is_primary)?.url || images[0]?.url || '';
+  const primaryImg = p.image_url || images.find((img) => img.is_primary)?.url || images[0]?.url || DEFAULT_PLACE_IMAGE;
 
   return {
     // Frontend camelCase properties
