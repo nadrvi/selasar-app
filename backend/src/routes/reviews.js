@@ -1,24 +1,8 @@
 import { Hono } from 'hono';
 import { query } from '../config/db.js';
+import { resolveUser } from '../utils/userResolver.js';
 
 export const reviewsRouter = new Hono();
-
-// Helper to resolve user ID from user_id, firebase_uid, or email
-async function resolveUserId({ user_id, firebase_uid, email }) {
-  if (user_id) {
-    const res = await query('SELECT id FROM users WHERE id = $1', [user_id]);
-    if (res.rows.length > 0) return res.rows[0].id;
-  }
-  if (firebase_uid) {
-    const res = await query('SELECT id FROM users WHERE firebase_uid = $1 OR id::text = $1', [firebase_uid]);
-    if (res.rows.length > 0) return res.rows[0].id;
-  }
-  if (email) {
-    const res = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
-    if (res.rows.length > 0) return res.rows[0].id;
-  }
-  return null;
-}
 
 // GET /api/reviews/place/:placeId - Get all reviews & community metrics for a place
 reviewsRouter.get('/place/:placeId', async (c) => {
@@ -66,11 +50,11 @@ reviewsRouter.get('/place/:placeId', async (c) => {
 
     // Check which reviews the requester found helpful
     let helpfulSet = new Set();
-    const currentUserId = await resolveUserId({ user_id, firebase_uid });
-    if (currentUserId && reviews.length > 0) {
+    const currentUser = await resolveUser({ user_id, firebase_uid });
+    if (currentUser && reviews.length > 0) {
       const helpfulRes = await query(
         'SELECT review_id FROM review_helpful WHERE user_id = $1 AND review_id = ANY($2::uuid[])',
-        [currentUserId, reviews.map((r) => r.id)]
+        [currentUser.id, reviews.map((r) => r.id)]
       );
       helpfulSet = new Set(helpfulRes.rows.map((row) => row.review_id));
     }
@@ -207,10 +191,11 @@ reviewsRouter.post('/', async (c) => {
     }
 
     // Lookup user by user_id, firebase_uid, or email
-    const userId = await resolveUserId({ user_id, firebase_uid, email });
-    if (!userId) {
+    const user = await resolveUser({ user_id, firebase_uid, email, uid: body.uid });
+    if (!user) {
       return c.json({ success: false, message: 'User belum terdaftar di database Selasar' }, 404);
     }
+    const userId = user.id;
 
     // Ensure safety_tags is an array of strings
     const sanitizedTags = Array.isArray(safety_tags)
@@ -319,10 +304,11 @@ reviewsRouter.post('/', async (c) => {
 reviewsRouter.post('/:id/helpful', async (c) => {
   try {
     const reviewId = c.req.param('id');
-    const { firebase_uid, user_id, email } = await c.req.json();
+    const { uid, firebase_uid, user_id, email } = await c.req.json();
 
-    const userId = await resolveUserId({ user_id, firebase_uid, email });
-    if (!userId) return c.json({ success: false, message: 'User tidak valid atau belum masuk' }, 401);
+    const user = await resolveUser({ user_id, firebase_uid, email, uid });
+    if (!user) return c.json({ success: false, message: 'User tidak valid atau belum masuk' }, 401);
+    const userId = user.id;
 
     const exist = await query('SELECT 1 FROM review_helpful WHERE review_id = $1 AND user_id = $2', [reviewId, userId]);
     

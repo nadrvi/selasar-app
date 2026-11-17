@@ -26,7 +26,7 @@ app.use(
   '*',
   cors({
     origin: (origin) => {
-      // Izinkan localhost port berapapun (5173, 3000, dll.) atau client URL dari env
+      // Izinkan localhost port berapapun (5173, 5174, 3000, dll.) atau client URL dari env
       if (!origin) return 'http://localhost:5173';
       if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
         return origin;
@@ -47,13 +47,12 @@ app.get('/', (c) => {
     status: 'online',
     service: 'Selasar REST API',
     framework: 'Hono.js',
-    database: 'selasar-db (PostgreSQL / Neon)',
-    version: '1.2.0',
+    version: '1.3.0',
     timestamp: new Date().toISOString(),
   });
 });
 
-// DB Ping check
+// Real dynamic DB Ping check
 app.get('/health/db', async (c) => {
   try {
     const res = await query('SELECT NOW() AS server_time, current_database() AS db_name');
@@ -66,7 +65,7 @@ app.get('/health/db', async (c) => {
     return c.json({
       status: 'error',
       message: err.message,
-      hint: 'Periksa DATABASE_URL di file selasar-backend/.env',
+      hint: 'Periksa DATABASE_URL di file backend/.env',
     }, 500);
   }
 });

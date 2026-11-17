@@ -1,12 +1,21 @@
 import { Hono } from 'hono';
 import { query } from '../config/db.js';
+import { resolveUser } from '../utils/userResolver.js';
 
 export const bookmarksRouter = new Hono();
 
-// GET /api/bookmarks/:firebaseUid - Get all bookmarked places by a user
-bookmarksRouter.get('/:firebaseUid', async (c) => {
+// ─────────────────────────────────────────────────────────────
+// GET /api/bookmarks/:uid
+// Mengambil semua bookmark user. uid bisa firebase_uid atau DB UUID.
+// ─────────────────────────────────────────────────────────────
+bookmarksRouter.get('/:uid', async (c) => {
   try {
-    const firebaseUid = c.req.param('firebaseUid');
+    const uid = c.req.param('uid');
+    const user = await resolveUser(uid);
+
+    if (!user) {
+      return c.json({ success: true, total: 0, data: [] });
+    }
 
     const sql = `
       SELECT 
@@ -25,6 +34,7 @@ bookmarksRouter.get('/:firebaseUid', async (c) => {
         CONCAT(COALESCE(p.plug_probability_pct, 80), '%') AS "colokanProbability",
         p.current_visitors AS "visitors",
         p.match_score AS "match",
+        p.distance_desc AS distance,
         c.name AS city,
         COALESCE(
           (SELECT url FROM place_images WHERE place_id = p.id ORDER BY is_primary DESC, sort_order ASC LIMIT 1),
@@ -32,14 +42,13 @@ bookmarksRouter.get('/:firebaseUid', async (c) => {
           ''
         ) AS image
       FROM bookmarks b
-      JOIN users u ON u.id = b.user_id
       JOIN places p ON p.id = b.place_id
       LEFT JOIN cities c ON c.id = p.city_id
-      WHERE u.firebase_uid = $1
+      WHERE b.user_id = $1
       ORDER BY b.created_at DESC
     `;
 
-    const result = await query(sql, [firebaseUid]);
+    const result = await query(sql, [user.id]);
 
     return c.json({
       success: true,
@@ -47,36 +56,72 @@ bookmarksRouter.get('/:firebaseUid', async (c) => {
       data: result.rows,
     });
   } catch (err) {
+    console.error('[BOOKMARK GET ERROR]:', err.message);
     return c.json({ success: false, message: err.message }, 500);
   }
 });
 
-// POST /api/bookmarks/toggle - Toggle bookmark
+
 bookmarksRouter.post('/toggle', async (c) => {
   try {
-    const { firebase_uid, place_id, note } = await c.req.json();
+    const body = await c.req.json();
+    const { uid, firebase_uid, user_id, place_id, note } = body;
 
-    if (!firebase_uid || !place_id) {
-      return c.json({ success: false, message: 'firebase_uid dan place_id wajib disertakan' }, 400);
+    // Terima berbagai field name dari frontend (uid, firebase_uid, atau user_id)
+    const identifier = uid || firebase_uid || user_id;
+
+    if (!identifier || !place_id) {
+      return c.json({
+        success: false,
+        message: 'uid/firebase_uid dan place_id wajib disertakan',
+      }, 400);
     }
 
-    const userRes = await query('SELECT id FROM users WHERE firebase_uid = $1', [firebase_uid]);
-    if (userRes.rows.length === 0) {
-      return c.json({ success: false, message: 'User tidak ditemukan' }, 404);
+    // Resolve user dari berbagai identifier type
+    const user = await resolveUser(String(identifier));
+    if (!user) {
+      return c.json({
+        success: false,
+        message: 'User tidak ditemukan. Pastikan sudah login terlebih dahulu.',
+      }, 404);
     }
-    const userId = userRes.rows[0].id;
 
-    const exist = await query('SELECT id FROM bookmarks WHERE user_id = $1 AND place_id = $2', [userId, place_id]);
+    const userId = user.id;
+    const placeIdNum = Number(place_id);
+
+    const exist = await query(
+      'SELECT id FROM bookmarks WHERE user_id = $1 AND place_id = $2',
+      [userId, placeIdNum]
+    );
 
     let bookmarked = false;
+
     if (exist.rows.length > 0) {
-      await query('DELETE FROM bookmarks WHERE user_id = $1 AND place_id = $2', [userId, place_id]);
+      // ── UNBOOKMARK ──
+      await query(
+        'DELETE FROM bookmarks WHERE user_id = $1 AND place_id = $2',
+        [userId, placeIdNum]
+      );
+      // Update counter di tabel places
+      await query(
+        'UPDATE places SET total_bookmarks = GREATEST(0, total_bookmarks - 1), updated_at = NOW() WHERE id = $1',
+        [placeIdNum]
+      );
       bookmarked = false;
     } else {
-      await query('INSERT INTO bookmarks (user_id, place_id, note) VALUES ($1, $2, $3)', [userId, place_id, note || null]);
+      // ── BOOKMARK ──
+      await query(
+        'INSERT INTO bookmarks (user_id, place_id, note) VALUES ($1, $2, $3)',
+        [userId, placeIdNum, note || null]
+      );
+      // Update counter di tabel places
+      await query(
+        'UPDATE places SET total_bookmarks = total_bookmarks + 1, updated_at = NOW() WHERE id = $1',
+        [placeIdNum]
+      );
       bookmarked = true;
 
-      // Cek apakah mencapai 10 bookmarks untuk badge 'bookworm'
+      // Cek badge 'bookworm' (10 bookmarks) — async, tidak block response
       query(`
         INSERT INTO user_badges (user_id, badge_id)
         SELECT $1, id FROM badges 
@@ -86,7 +131,15 @@ bookmarksRouter.post('/toggle', async (c) => {
       `, [userId]).catch(() => {});
     }
 
-    const countRes = await query('SELECT total_bookmarks FROM places WHERE id = $1', [place_id]);
+    // Ambil total terkini dari DB
+    const countRes = await query(
+      'SELECT total_bookmarks FROM places WHERE id = $1',
+      [placeIdNum]
+    );
+
+    console.log(
+      `[BOOKMARK] user=${userId} place=${placeIdNum} → ${bookmarked ? 'SAVED' : 'REMOVED'}`
+    );
 
     return c.json({
       success: true,
@@ -94,6 +147,30 @@ bookmarksRouter.post('/toggle', async (c) => {
       total_bookmarks: countRes.rows[0]?.total_bookmarks || 0,
     });
   } catch (err) {
+    console.error('[BOOKMARK TOGGLE ERROR]:', err.message);
     return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/bookmarks/:uid/check/:placeId
+// Cek apakah tempat tertentu sudah di-bookmark oleh user ini
+// ─────────────────────────────────────────────────────────────
+bookmarksRouter.get('/:uid/check/:placeId', async (c) => {
+  try {
+    const uid = c.req.param('uid');
+    const placeId = Number(c.req.param('placeId'));
+
+    const user = await resolveUser(uid);
+    if (!user) return c.json({ success: true, bookmarked: false });
+
+    const res = await query(
+      'SELECT id FROM bookmarks WHERE user_id = $1 AND place_id = $2',
+      [user.id, placeId]
+    );
+
+    return c.json({ success: true, bookmarked: res.rows.length > 0 });
+  } catch (err) {
+    return c.json({ success: false, bookmarked: false, message: err.message }, 500);
   }
 });

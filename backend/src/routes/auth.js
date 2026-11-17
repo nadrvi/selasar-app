@@ -194,9 +194,54 @@ authRouter.post('/social', async (c) => {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-    const baseUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '').slice(0, 20);
 
-    const upsertSql = `
+    // 1. Cek apakah user sudah terdaftar di database (berdasarkan email atau firebase_uid)
+    const existRes = await query(
+      'SELECT id, username, email FROM users WHERE LOWER(email) = LOWER($1) OR (firebase_uid IS NOT NULL AND firebase_uid = $2)',
+      [cleanEmail, firebase_uid || '']
+    );
+
+    if (existRes.rows.length > 0) {
+      // User sudah ada -> Link/Update profil sosial & last_login_at
+      const existing = existRes.rows[0];
+      const updateSql = `
+        UPDATE users SET
+          firebase_uid = COALESCE($1, users.firebase_uid),
+          display_name = COALESCE($2, users.display_name),
+          avatar_url = COALESCE($3, users.avatar_url),
+          last_login_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $4
+        RETURNING id, username, email, display_name, avatar_url, role, birthday, created_at
+      `;
+
+      const result = await query(updateSql, [
+        firebase_uid || null,
+        display_name || null,
+        avatar_url || null,
+        existing.id,
+      ]);
+
+      console.log(`[AUTH] Akun sosial berhasil disinkronkan ke user ID ${existing.id}: ${cleanEmail}`);
+
+      return c.json({
+        success: true,
+        message: 'Akun sosial berhasil disinkronkan ke database.',
+        data: result.rows[0],
+      });
+    }
+
+    // 2. User baru -> Generate unique username aman
+    let base = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '').slice(0, 20);
+    if (base.length < 3) base = `user_${base}`;
+
+    let candidateUsername = base;
+    const clash = await query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [candidateUsername]);
+    if (clash.rows.length > 0) {
+      candidateUsername = `${base.slice(0, 15)}_${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    const insertSql = `
       INSERT INTO users (
         firebase_uid,
         email,
@@ -207,30 +252,24 @@ authRouter.post('/social', async (c) => {
         created_at,
         updated_at
       ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), NOW())
-      ON CONFLICT (email) DO UPDATE SET
-        firebase_uid = COALESCE(EXCLUDED.firebase_uid, users.firebase_uid),
-        display_name = COALESCE(EXCLUDED.display_name, users.display_name),
-        avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
-        last_login_at = NOW(),
-        updated_at = NOW()
       RETURNING id, username, email, display_name, avatar_url, role, birthday, created_at
     `;
 
-    const result = await query(upsertSql, [
+    const result = await query(insertSql, [
       firebase_uid || null,
       cleanEmail,
-      baseUsername || 'user_selasar',
-      display_name || baseUsername,
+      candidateUsername,
+      display_name || candidateUsername,
       avatar_url || null,
     ]);
 
-    console.log(`[AUTH] Akun sosial berhasil disinkronkan ke selasar-db: ${cleanEmail}`);
+    console.log(`[AUTH] Akun sosial baru berhasil didaftarkan: ${cleanEmail}`);
 
     return c.json({
       success: true,
-      message: 'Akun sosial berhasil tersimpan di database.',
+      message: 'Pendaftaran akun sosial berhasil tersimpan di database.',
       data: result.rows[0],
-    });
+    }, 201);
   } catch (err) {
     console.error('[AUTH ERROR /social]:', err);
     return c.json({ success: false, message: err.message }, 500);

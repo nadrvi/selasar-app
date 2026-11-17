@@ -30,6 +30,7 @@ import {
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
+import { toggleBookmarkAPI } from "../services/api";
 
 const FALLBACK_PLACE_IMG =
   "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
@@ -260,6 +261,17 @@ export default function Map() {
       else next.add(target.id);
       return next;
     });
+
+    // Sinkronkan ke PostgreSQL Backend (selasar-db)
+    try {
+      const user = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      const userIdentifier = user?.uid || user?.id;
+      if (userIdentifier) {
+        toggleBookmarkAPI(userIdentifier, target.id).catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleOpenRoute = (loc) => {

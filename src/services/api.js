@@ -194,21 +194,35 @@ export async function fetchUserProfile(firebaseUid) {
 //  BOOKMARKS / FAVORITES API
 // ============================================================
 
-export async function fetchUserBookmarks(firebaseUid) {
+/**
+ * Ambil semua bookmark user dari database.
+ * uid bisa berupa firebase_uid (Google/sosial) atau DB UUID (email/password).
+ */
+export async function fetchUserBookmarks(uid) {
+  if (!uid) return [];
   try {
-    const res = await fetchAPI(`/api/bookmarks/${firebaseUid}`);
+    const res = await fetchAPI(`/api/bookmarks/${uid}`);
     return res.data || [];
   } catch {
     return [];
   }
 }
 
-export async function toggleBookmarkAPI(firebaseUid, placeId, note = null) {
+/**
+ * Toggle bookmark on/off untuk sebuah tempat.
+ * uid: bisa firebase_uid (Google) ATAU DB UUID (email/password login).
+ * Backend sekarang mendukung kedua tipe uid.
+ */
+export async function toggleBookmarkAPI(uid, placeId, note = null) {
+  if (!uid || !placeId) {
+    console.warn('[Selasar API] toggleBookmarkAPI: uid dan placeId wajib diisi');
+    return null;
+  }
   try {
     const res = await fetchAPI('/api/bookmarks/toggle', {
       method: 'POST',
       body: JSON.stringify({
-        firebase_uid: firebaseUid,
+        uid,          // field universal, backend mendeteksi firebase_uid vs UUID
         place_id: placeId,
         note,
       }),
@@ -217,6 +231,19 @@ export async function toggleBookmarkAPI(firebaseUid, placeId, note = null) {
   } catch (err) {
     console.warn('[Selasar API] Toggle bookmark error:', err.message);
     return null;
+  }
+}
+
+/**
+ * Cek apakah satu tempat sudah di-bookmark oleh user tertentu.
+ */
+export async function checkBookmarkAPI(uid, placeId) {
+  if (!uid || !placeId) return false;
+  try {
+    const res = await fetchAPI(`/api/bookmarks/${uid}/check/${placeId}`);
+    return res.bookmarked === true;
+  } catch {
+    return false;
   }
 }
 

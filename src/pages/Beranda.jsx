@@ -14,12 +14,10 @@ import {
   FaPlug,
   FaWifi,
   FaUsers,
-  FaBookmark,
   FaLocationArrow,
   FaTag,
   FaCog,
   FaSearch,
-  FaPen,
 } from "react-icons/fa";
 import CommunityReviewModal from "../components/CommunityReviewModal";
 import CommunityReviewsSection from "../components/CommunityReviewsSection";
@@ -149,7 +147,6 @@ export default function Beranda() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("Show Everything");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [selectedBanner, setSelectedBanner] = useState(null);
   const [placesList, setPlacesList] = useState(placesData);
@@ -347,10 +344,12 @@ export default function Beranda() {
     });
 
     // Sinkronkan ke PostgreSQL Backend (selasar-db) jika user login
+    // BUG FIX: gunakan user.uid yang bisa berupa firebase_uid ATAU DB UUID
     try {
       const user = JSON.parse(localStorage.getItem("selasarUser") || "{}");
-      if (user?.uid) {
-        toggleBookmarkAPI(user.uid, placeId);
+      const userIdentifier = user?.uid || user?.id;
+      if (userIdentifier) {
+        toggleBookmarkAPI(userIdentifier, placeId).catch(() => {});
       }
     } catch {
       /* ignore */

@@ -21,6 +21,7 @@ import {
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
+import { toggleBookmarkAPI } from "../services/api";
 
 const dummyPlaces = [
   {
@@ -319,6 +320,17 @@ export default function Searching() {
     setSavedPlaces((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
+
+    // Sinkronkan ke PostgreSQL Backend (selasar-db)
+    try {
+      const user = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      const userIdentifier = user?.uid || user?.id;
+      if (userIdentifier) {
+        toggleBookmarkAPI(userIdentifier, id).catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   // ==== SORT DROPDOWN ====
