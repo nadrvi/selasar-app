@@ -78,6 +78,7 @@ export default function CommunityReviewsSection({
   const [summary, setSummary]                   = useState(null);
   const [communityInsights, setCommunityInsights] = useState(null);
   const [loading, setLoading]                   = useState(true);
+  const [loadError, setLoadError]               = useState("");
   const [sort, setSort]                         = useState("latest");
   const [filterPurpose, setFilterPurpose]       = useState("all");
 
@@ -89,14 +90,19 @@ export default function CommunityReviewsSection({
     (async () => {
       if (!placeId) return;
       setLoading(true);
+      setLoadError("");
       try {
         const res = await fetchPlaceReviews(placeId, sort, uid);
-        if (alive && res.success) {
+        if (alive) {
           setReviews(res.data || []);
           setSummary(res.summary || null);
           setCommunityInsights(res.community_insights || null);
         }
-      } catch {}
+      } catch (err) {
+        if (!alive) return;
+        console.error("[CommunityReviews] Gagal memuat ulasan:", err);
+        setLoadError(err.message);
+      }
       finally { if (alive) setLoading(false); }
     })();
     return () => { alive = false; };
@@ -314,6 +320,18 @@ export default function CommunityReviewsSection({
         <div className="py-10 flex flex-col items-center gap-2 text-gray-400">
           <div className="w-5 h-5 border-2 border-[#8B6B4F] border-t-transparent rounded-full animate-spin" />
           <span className="text-xs">Memuat ulasan...</span>
+        </div>
+      ) : loadError ? (
+        <div
+          role="alert"
+          className="py-8 px-4 text-center rounded-2xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900"
+        >
+          <p className="text-sm font-bold text-red-700 dark:text-red-300">
+            Gagal memuat ulasan
+          </p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+            {loadError}
+          </p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-10 text-center rounded-2xl bg-gray-50 dark:bg-[#1F1B18]/60 border border-dashed border-gray-200 dark:border-[#3D342D] space-y-2.5">

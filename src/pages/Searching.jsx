@@ -21,180 +21,7 @@ import {
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
-import { toggleBookmarkAPI } from "../services/api";
-
-const dummyPlaces = [
-  {
-    id: 1,
-    name: "Kebon Raya Escape",
-    type: "Alam",
-    city: "Bogor",
-    address: "Jl. Otto Iskandardinata No. 13, Bogor",
-    img: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Terbatas",
-    wifi: "Standar",
-    keramaian: "Sedang",
-    cocok: "Me time, Hangout",
-    match: 80,
-    price: 10000,
-    rating: 4.3,
-    description:
-      "Area terbuka hijau dengan suasana yang tenang dan udara yang sejuk. Cocok untuk melepas penat, membaca buku, atau mengerjakan tugas ringan sambil menikmati suasana alam.",
-  },
-  {
-    id: 2,
-    name: "Kopi Nalar",
-    type: "Cafe",
-    city: "Jakarta",
-    address: "Jl. Masjid Nurul Hidayah, Tambun",
-    img: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Tersedia",
-    wifi: "Cepat",
-    keramaian: "Ramai",
-    cocok: "Me Time, WFC",
-    match: 95,
-    price: 25000,
-    rating: 4.8,
-    description:
-      "Cafe bergaya minimalis dengan suasana nyaman untuk bekerja maupun belajar. Dilengkapi WiFi cepat, banyak pilihan menu, dan area duduk yang luas.",
-  },
-  {
-    id: 3,
-    name: "Ruang Seduh",
-    type: "Coworking",
-    city: "Jakarta",
-    address: "Jl. Kemang Raya, Jakarta",
-    img: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Banyak",
-    wifi: "Super Cepat",
-    keramaian: "Sepi",
-    cocok: "Deadline, Fokus",
-    match: 98,
-    price: 50000,
-    rating: 4.9,
-    description:
-      "Coworking space dengan lingkungan yang tenang, kursi ergonomis, dan internet berkecepatan tinggi. Sangat cocok untuk menyelesaikan deadline, meeting online, maupun bekerja secara fokus.",
-  },
-  {
-    id: 4,
-    name: "Forest Brew",
-    type: "Cafe",
-    city: "Bekasi",
-    address: "Jl. Raya Hankam No. 22, Bekasi",
-    img: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Banyak",
-    wifi: "Cepat",
-    keramaian: "Sedang",
-    cocok: "Belajar, Nongkrong",
-    match: 92,
-    price: 30000,
-    rating: 4.6,
-    description:
-      "Cafe bernuansa kayu dan tanaman hijau yang memberikan suasana hangat dan nyaman. Cocok untuk belajar bersama teman atau bekerja dari laptop.",
-  },
-  {
-    id: 5,
-    name: "Skyline Coffee",
-    type: "Cafe",
-    city: "Bandung",
-    address: "Jl. Ahmad Yani No. 45, Bandung",
-    img: "https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Tersedia",
-    wifi: "Cepat",
-    keramaian: "Sedang",
-    cocok: "WFC, Meeting",
-    match: 94,
-    price: 35000,
-    rating: 4.7,
-    description:
-      "Memiliki area rooftop dengan pemandangan kota yang menarik. Tempat yang nyaman untuk meeting santai maupun bekerja sambil menikmati kopi.",
-  },
-  {
-    id: 6,
-    name: "Creative Hub",
-    type: "Coworking",
-    city: "Bandung",
-    address: "Jl. Diponegoro No. 10, Bandung",
-    img: "https://images.unsplash.com/photo-1497366412874-3415097a27e7?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Banyak",
-    wifi: "Super Cepat",
-    keramaian: "Sepi",
-    cocok: "Coding, Meeting",
-    match: 99,
-    price: 60000,
-    rating: 4.9,
-    description:
-      "Ruang kerja modern dengan fasilitas lengkap seperti ruang meeting, WiFi stabil, dan banyak stop kontak. Pilihan ideal bagi programmer, freelancer, maupun startup.",
-  },
-  {
-    id: 7,
-    name: "Taman Harmoni",
-    type: "Alam",
-    city: "Bekasi",
-    address: "Jl. Raya Bekasi No. 88, Bekasi",
-    img: "https://images.unsplash.com/photo-1473773508845-188df298d2d1?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Tidak Ada",
-    wifi: "Tidak Tersedia",
-    keramaian: "Sepi",
-    cocok: "Healing, Me Time",
-    match: 78,
-    price: 5000,
-    rating: 4.1,
-    description:
-      "Taman kota dengan pepohonan rindang dan suasana yang asri. Tempat yang cocok untuk mencari inspirasi, bersantai, atau sekadar menikmati udara segar.",
-  },
-  {
-    id: 8,
-    name: "Daily Grind",
-    type: "Cafe",
-    city: "Jakarta",
-    address: "Jl. Kalimalang No. 7, Jakarta",
-    img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Banyak",
-    wifi: "Cepat",
-    keramaian: "Ramai",
-    cocok: "Belajar, Nongkrong",
-    match: 90,
-    price: 28000,
-    rating: 4.5,
-    description:
-      "Cafe dengan konsep industrial modern dan pencahayaan yang nyaman. Menyediakan banyak meja besar sehingga cocok untuk belajar kelompok.",
-  },
-  {
-    id: 9,
-    name: "Library Corner",
-    type: "Perpustakaan",
-    city: "Bogor",
-    address: "Jl. Pendidikan No. 15, Bogor",
-    img: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Tersedia",
-    wifi: "Cepat",
-    keramaian: "Sangat Sepi",
-    cocok: "Belajar, Riset",
-    match: 97,
-    price: 0,
-    rating: 4.8,
-    description:
-      "Perpustakaan modern dengan ruang baca yang nyaman, koleksi buku yang lengkap, dan area diskusi. Sangat mendukung aktivitas belajar tanpa gangguan.",
-  },
-  {
-    id: 10,
-    name: "Sunrise Workspace",
-    type: "Coworking",
-    city: "Jakarta",
-    address: "Jl. Boulevard Selatan No. 5, Jakarta",
-    img: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1000&q=80",
-    colokan: "Sangat Banyak",
-    wifi: "Super Cepat",
-    keramaian: "Sedang",
-    cocok: "Remote Working, Startup",
-    match: 96,
-    price: 75000,
-    rating: 4.9,
-    description:
-      "Coworking space premium dengan ruang kerja luas, internet berkecepatan tinggi, serta suasana profesional yang mendukung produktivitas sepanjang hari.",
-  },
-];
+import { fetchPlaces, toggleBookmarkAPI } from "../services/api";
 
 const SORT_OPTIONS = [
   { value: "Match", label: "Paling Cocok" },
@@ -218,9 +45,31 @@ export default function Searching() {
   const [searchQuery, setSearchQuery] = useState(
     () => location.state?.query || "",
   );
+  const [places, setPlaces] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(true);
+  const [placesLoadError, setPlacesLoadError] = useState("");
   const [isExiting, setIsExiting] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchPlaces()
+      .then((data) => {
+        if (isMounted) setPlaces(data);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("[Searching] Gagal memuat tempat dari database:", err);
+        setPlacesLoadError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setPlacesLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (location.state?.autoFocus !== false) {
@@ -260,44 +109,45 @@ export default function Searching() {
       source: "searching",
       id: place.id,
       name: place.name,
-      image: place.img,
+      image: place.image,
       subtitle: place.address,
       match: place.match,
     });
     setSelectedPlace(place);
   };
 
-  const filteredPlaces = dummyPlaces.filter((place) => {
+  const filteredPlaces = places.filter((place) => {
     const q = searchQuery.toLowerCase().trim();
+    const searchableContent = [
+      place.name,
+      place.address,
+      place.mood,
+      place.category,
+      place.city,
+      place.noiseLevel,
+      place.wifiStatus,
+      place.specs?.plug,
+      place.description,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     const matchSearch =
       !q ||
-      place.name.toLowerCase().includes(q) ||
-      place.address.toLowerCase().includes(q) ||
-      place.cocok.toLowerCase().includes(q) ||
-      place.type.toLowerCase().includes(q) ||
-      (place.city && place.city.toLowerCase().includes(q)) ||
-      (q.includes("colokan") && place.colokan.toLowerCase() !== "tidak ada") ||
-      (q.includes("stopkontak") &&
-        place.colokan.toLowerCase() !== "tidak ada") ||
-      (q.includes("wifi") && place.wifi.toLowerCase() !== "tidak tersedia") ||
-      (q.includes("ngebut") &&
-        (place.wifi === "Cepat" || place.wifi === "Super Cepat")) ||
-      (q.includes("tenang") &&
-        (place.keramaian === "Sepi" ||
-          place.keramaian === "Sangat Sepi" ||
-          place.keramaian === "Sedang")) ||
-      (q.includes("hening") &&
-        (place.keramaian === "Sepi" || place.keramaian === "Sangat Sepi")) ||
-      (q.includes("24 jam") && place.type === "Coworking");
+      searchableContent.includes(q) ||
+      (q.includes("colokan") && Boolean(place.colokanProbability)) ||
+      (q.includes("stopkontak") && Boolean(place.colokanProbability)) ||
+      (q.includes("wifi") && Boolean(place.wifiStatus));
 
     const matchColokan =
       activeFilters.colokan === "Semua" ||
-      place.colokan === activeFilters.colokan;
+      place.specs?.plug === activeFilters.colokan;
     const matchWifi =
-      activeFilters.wifi === "Semua" || place.wifi === activeFilters.wifi;
+      activeFilters.wifi === "Semua" ||
+      place.wifiStatus === activeFilters.wifi;
     const matchKeramaian =
       activeFilters.keramaian === "Semua" ||
-      place.keramaian === activeFilters.keramaian;
+      place.noiseLevel === activeFilters.keramaian;
 
     return matchSearch && matchColokan && matchWifi && matchKeramaian;
   });
@@ -309,12 +159,12 @@ export default function Searching() {
       .map((f) => f.id),
   );
   const toggleSave = (id) => {
-    const place = dummyPlaces.find((p) => p.id === id);
+    const place = places.find((p) => p.id === id);
     toggleFavoriteStore({
       source: "searching",
       id,
       name: place?.name,
-      image: place?.img,
+      image: place?.image,
       match: place?.match,
     });
     setSavedPlaces((prev) =>
@@ -350,20 +200,20 @@ export default function Searching() {
   const sortedPlaces = [...filteredPlaces].sort((a, b) => {
     switch (sortBy) {
       case "Match":
-        return b.match - a.match;
+        return (b.match ?? 0) - (a.match ?? 0);
       case "Name":
         return a.name.localeCompare(b.name);
       case "PriceAsc":
-        return (a.price ?? 0) - (b.price ?? 0);
+        return (a.price_min ?? 0) - (b.price_min ?? 0);
       case "PriceDesc":
-        return (b.price ?? 0) - (a.price ?? 0);
+        return (b.price_min ?? 0) - (a.price_min ?? 0);
       case "Rating":
-        return (b.rating ?? 0) - (a.rating ?? 0);
+        return (b.avg_rating ?? 0) - (a.avg_rating ?? 0);
       case "Favorite": {
         const aFav = savedPlaces.includes(a.id) ? 1 : 0;
         const bFav = savedPlaces.includes(b.id) ? 1 : 0;
         if (aFav !== bFav) return bFav - aFav;
-        return b.match - a.match;
+        return (b.match ?? 0) - (a.match ?? 0);
       }
       default:
         return 0;
@@ -372,6 +222,14 @@ export default function Searching() {
 
   const currentSortLabel =
     SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? "Urutkan";
+  const filterOptions = {
+    colokan: [...new Set(places.map((place) => place.specs?.plug).filter(Boolean))],
+    wifi: [...new Set(places.map((place) => place.wifiStatus).filter(Boolean))],
+    keramaian: [...new Set(places.map((place) => place.noiseLevel).filter(Boolean))],
+  };
+  const searchSuggestions = [
+    ...new Set(places.flatMap((place) => [place.name, place.city]).filter(Boolean)),
+  ].slice(0, 6);
 
   return (
     <div className="min-h-screen bg-[#EDE8DE] dark:bg-[#1F1B18] p-4 sm:p-6 md:p-8 font-sans flex flex-col items-center overflow-x-hidden transition-colors duration-500">
@@ -464,16 +322,9 @@ export default function Searching() {
           >
             <div className="p-4">
               <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-2">
-                <FaHistory /> Pencarian Populer &amp; Terakhir
+                <FaHistory /> Tempat dan kota di database
               </p>
-              {[
-                "Ruang Seduh",
-                "Kopi Nalar",
-                "Stopkontak Banyak",
-                "WiFi Ngebut",
-                "Bogor",
-                "Bandung",
-              ].map((item) => (
+              {searchSuggestions.map((item) => (
                 <div
                   key={item}
                   onMouseDown={() => {
@@ -486,6 +337,13 @@ export default function Searching() {
                   <span className="text-xs text-gray-400">Pilih</span>
                 </div>
               ))}
+              {searchSuggestions.length === 0 && (
+                <p className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                  {placesLoading
+                    ? "Memuat saran..."
+                    : placesLoadError || "Belum ada tempat di database."}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -508,22 +366,22 @@ export default function Searching() {
               cat: "colokan",
               icon: <FaPlug size={20} />,
               title: "Ketersediaan Colokan",
-              desc: "Prioritaskan tempat dengan colokan",
-              options: ["Semua", "Terbatas", "Tersedia", "Banyak"],
+              desc: "Pilih fasilitas colokan yang tercatat",
+              options: filterOptions.colokan,
             },
             {
               cat: "wifi",
               icon: <FaWifi size={20} />,
               title: "Kecepatan WiFi",
-              desc: "Pilih minimal kecepatan yang kamu butuhkan",
-              options: ["Semua", "Standar", "Cepat", "Super Cepat"],
+              desc: "Pilih data WiFi yang tercatat",
+              options: filterOptions.wifi,
             },
             {
               cat: "keramaian",
               icon: <FaUsers size={20} />,
               title: "Tingkat Keramaian",
-              desc: "Pilih tingkat keramaian yang nyaman",
-              options: ["Semua", "Sepi", "Sedang", "Ramai"],
+              desc: "Pilih suasana yang tercatat",
+              options: filterOptions.keramaian,
             },
           ].map((f) => (
             <div
@@ -538,6 +396,16 @@ export default function Searching() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 sm:mb-0">{f.desc}</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleFilterClick(f.cat, "Semua")}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 active:scale-90 border ${
+                    activeFilters[f.cat] === "Semua"
+                      ? "bg-[#4A3B38] text-white border-[#4A3B38] shadow-md scale-105"
+                      : "bg-[#F3EFEA] dark:bg-[#3D342D] text-[#4A3B38] dark:text-[#F5F2EB] border-[#cbbdb0] dark:border-[#4a4038] hover:bg-[#e4dacd] dark:hover:bg-[#443a32]"
+                  }`}
+                >
+                  Semua
+                </button>
                 {f.options.map((btn) => (
                   <button
                     key={btn}
@@ -623,7 +491,22 @@ export default function Searching() {
             </div>
           </div>
 
-          {sortedPlaces.length > 0 ? (
+          {placesLoading ? (
+            <div role="status" className="bg-white dark:bg-[#2A2521] rounded-3xl p-10 text-center border border-gray-200 dark:border-[#3D342D]">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Memuat tempat dari database...
+              </p>
+            </div>
+          ) : placesLoadError ? (
+            <div role="alert" className="bg-white dark:bg-[#2A2521] rounded-3xl p-10 text-center border border-red-300 dark:border-red-900">
+              <h3 className="text-xl font-bold text-[#4A3B38] dark:text-[#F5F2EB] mb-2">
+                Gagal memuat tempat
+              </h3>
+              <p className="text-sm text-red-700 dark:text-red-300">
+                {placesLoadError}
+              </p>
+            </div>
+          ) : sortedPlaces.length > 0 ? (
             sortedPlaces.map((place) => (
               <div
                 key={place.id}
@@ -632,7 +515,7 @@ export default function Searching() {
               >
                 <div className="sm:w-[35%] h-48 sm:h-auto overflow-hidden">
                   <img
-                    src={place.img}
+                    src={place.image || ""}
                     alt={place.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
@@ -644,7 +527,7 @@ export default function Searching() {
                         {place.name}
                       </h3>
                       <span className="text-[10px] bg-white dark:bg-[#332C27] border border-[#cbbdb0] dark:border-[#4a4038] text-[#4A3B38] dark:text-[#F5F2EB] px-3 py-1 rounded-full font-bold shadow-sm">
-                        {place.type}
+                        {place.category}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-2 font-medium">
@@ -654,12 +537,14 @@ export default function Searching() {
                     <p className="text-[11px] font-semibold text-[#6B554F] dark:text-[#C4A876] flex items-center gap-3 mb-3">
                       <span className="flex items-center gap-1">
                         <FaStar size={10} className="text-yellow-500" />
-                        {place.rating}
+                        {place.avg_rating ?? "Belum ada"}
                       </span>
                       <span>
-                        {place.price === 0
+                        {place.price_min === 0
                           ? "Gratis"
-                          : `Rp${place.price.toLocaleString("id-ID")}`}
+                          : place.price_min == null
+                            ? "Harga belum tersedia"
+                            : `Rp${place.price_min.toLocaleString("id-ID")}`}
                       </span>
                     </p>
                   </div>
@@ -671,7 +556,7 @@ export default function Searching() {
                           <FaPlug size={12} className="text-[#6B554F] dark:text-[#C4A876]" />
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                          {place.colokan}
+                          {place.colokanProbability || "Belum ada data"}
                         </p>
                       </div>
                       <div>
@@ -679,13 +564,13 @@ export default function Searching() {
                           WiFi <FaWifi size={12} className="text-[#6B554F] dark:text-[#C4A876]" />
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                          {place.wifi}
+                          {place.wifiStatus || "Belum ada data"}
                         </p>
                       </div>
                       <div>
                         <p className="font-bold text-xs text-[#4A3B38] dark:text-[#F5F2EB] flex items-center gap-1.5 mb-0.5">
                           <FaUsers size={12} className="text-[#6B554F] dark:text-[#C4A876]" />{" "}
-                          {place.keramaian}
+                          {place.noiseLevel || "Belum ada data"}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                           Cocok
@@ -714,11 +599,11 @@ export default function Searching() {
                     <p className="font-bold text-sm text-[#4A3B38] dark:text-[#F5F2EB]">
                       Cocok untuk:{" "}
                       <span className="font-medium text-gray-600 dark:text-gray-400">
-                        {place.cocok}
+                        {place.mood || "Belum ada data"}
                       </span>
                     </p>
                     <div className="bg-[#F3EFEA] dark:bg-[#332C27] px-3 py-1.5 rounded-lg text-xs font-bold text-[#4A3B38] dark:text-[#F5F2EB] shadow-sm">
-                      {place.match}% match
+                      {place.match == null ? "Match belum tersedia" : `${place.match}% match`}
                     </div>
                   </div>
                 </div>
@@ -727,24 +612,29 @@ export default function Searching() {
           ) : (
             <div className="bg-white dark:bg-[#2A2521] rounded-3xl p-10 text-center border-2 border-dashed border-[#cbbdb0] dark:border-[#4a4038]">
               <h3 className="text-xl font-bold text-[#4A3B38] dark:text-[#F5F2EB] mb-2">
-                Yah, tempatnya nggak ketemu 🥲
+                {places.length === 0
+                  ? "Belum ada tempat aktif"
+                  : "Yah, tempatnya nggak ketemu 🥲"}
               </h3>
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-                Coba cari dengan kata kunci lain atau longgarkan filter
-                pencarianmu.
+                {places.length === 0
+                  ? "Database belum memiliki tempat yang aktif."
+                  : "Coba cari dengan kata kunci lain atau longgarkan filter pencarianmu."}
               </p>
-              <button
-                onClick={() =>
-                  setActiveFilters({
-                    colokan: "Semua",
-                    wifi: "Semua",
-                    keramaian: "Semua",
-                  })
-                }
-                className="px-6 py-2.5 bg-[#4A3B38] text-white rounded-full text-sm font-bold shadow-sm hover:scale-105 active:scale-95 transition-all"
-              >
-                Reset Filter
-              </button>
+              {places.length > 0 && (
+                <button
+                  onClick={() =>
+                    setActiveFilters({
+                      colokan: "Semua",
+                      wifi: "Semua",
+                      keramaian: "Semua",
+                    })
+                  }
+                  className="px-6 py-2.5 bg-[#4A3B38] text-white rounded-full text-sm font-bold shadow-sm hover:scale-105 active:scale-95 transition-all"
+                >
+                  Reset Filter
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -769,7 +659,7 @@ export default function Searching() {
 
             <div className="w-full md:w-[45%] h-[250px] md:h-auto overflow-hidden">
               <img
-                src={selectedPlace.img}
+                src={selectedPlace.image || ""}
                 alt={selectedPlace.name}
                 className="w-full h-full object-cover"
               />
@@ -781,7 +671,7 @@ export default function Searching() {
                   {selectedPlace.name}
                 </h2>
                 <p className="text-sm text-green-700 dark:text-green-400 font-medium mb-4">
-                  Cocok untuk: {selectedPlace.cocok}
+                  Cocok untuk: {selectedPlace.mood || "Belum ada data"}
                 </p>
 
                 <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-6 bg-gray-50 dark:bg-[#1F1B18] p-4 rounded-2xl italic">
@@ -793,13 +683,17 @@ export default function Searching() {
                     <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
                       <FaPlug /> Colokan
                     </p>
-                    <p className="font-semibold">{selectedPlace.colokan}</p>
+                    <p className="font-semibold">
+                      {selectedPlace.colokanProbability || "Belum ada data"}
+                    </p>
                   </div>
                   <div className="bg-[#F4EFE8] dark:bg-[#332C27] p-4 rounded-2xl">
                     <p className="font-bold flex items-center gap-2 mb-1 text-gray-500 dark:text-gray-400">
                       <FaWifi /> WiFi
                     </p>
-                    <p className="font-semibold">{selectedPlace.wifi}</p>
+                    <p className="font-semibold">
+                      {selectedPlace.wifiStatus || "Belum ada data"}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -21,7 +21,6 @@ import {
   FaPen,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
-import { placesData } from "../data/place";
 import SelasarMap from "../components/SelasarMap";
 import CommunityReviewModal from "../components/CommunityReviewModal";
 import CommunityReviewsSection from "../components/CommunityReviewsSection";
@@ -30,7 +29,7 @@ import {
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
-import { toggleBookmarkAPI } from "../services/api";
+import { fetchPlaces, toggleBookmarkAPI } from "../services/api";
 
 const FALLBACK_PLACE_IMG =
   "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
@@ -40,6 +39,9 @@ export default function Map() {
   const location = useLocation();
 
   const [isLoaded, setIsLoaded] = useState(false);
+  const [places, setPlaces] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(true);
+  const [placesLoadError, setPlacesLoadError] = useState("");
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -101,6 +103,25 @@ export default function Map() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    fetchPlaces()
+      .then((data) => {
+        if (isMounted) setPlaces(data);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("[Map] Gagal memuat tempat dari database:", err);
+        setPlacesLoadError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setPlacesLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Modal Escape Logic
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -117,12 +138,12 @@ export default function Map() {
   }, [selectedLocation, handleBack]);
 
   // Real-time filtering
-  const filteredLocations = placesData.filter((loc) => {
+  const filteredLocations = places.filter((loc) => {
     // 1. City Filter
     const matchCity =
       activeCity === "Semua Kota" ||
       activeCity === "Semua" ||
-      loc.city.toLowerCase() === activeCity.toLowerCase();
+      (loc.city || "").toLowerCase() === activeCity.toLowerCase();
 
     // 2. Category Filter
     const matchCat =
@@ -132,11 +153,11 @@ export default function Map() {
     const q = searchQuery.toLowerCase().trim();
     const matchSearch =
       !q ||
-      loc.name.toLowerCase().includes(q) ||
-      loc.address.toLowerCase().includes(q) ||
-      loc.city.toLowerCase().includes(q) ||
-      loc.category.toLowerCase().includes(q) ||
-      loc.mood.toLowerCase().includes(q) ||
+      (loc.name || "").toLowerCase().includes(q) ||
+      (loc.address || "").toLowerCase().includes(q) ||
+      (loc.city || "").toLowerCase().includes(q) ||
+      (loc.category || "").toLowerCase().includes(q) ||
+      (loc.mood || "").toLowerCase().includes(q) ||
       (q.includes("colokan") && loc.colokanProbability) ||
       (q.includes("wifi") && loc.wifiStatus);
 
@@ -333,7 +354,11 @@ export default function Map() {
               </span>
               <span className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] sm:text-[11px] font-extrabold rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {filteredLocations.length} Spot Aktif
+                {placesLoading
+                  ? "Memuat tempat..."
+                  : placesLoadError
+                    ? "Gagal memuat tempat"
+                    : `${filteredLocations.length} Spot Aktif`}
               </span>
             </div>
             <div className="flex-1 h-px bg-gradient-to-l from-transparent via-[#C4A876]/40 to-[#8B6B4F]/60 dark:via-[#C4A876]/25 dark:to-[#8B6B4F]/40 hidden sm:block" />
@@ -367,29 +392,43 @@ export default function Map() {
           <div className="mt-5 sm:mt-7 w-full h-px bg-gradient-to-r from-transparent via-[#8B6B4F]/25 to-transparent dark:via-[#C4A876]/15" />
         </div>
 
-        {filteredLocations.length === 0 ? (
+        {placesLoading || placesLoadError ? (
+          <div
+            role={placesLoadError ? "alert" : "status"}
+            className="flex items-center justify-center py-14 sm:py-20 px-4 bg-white/60 dark:bg-[#2A2521]/60 rounded-3xl border border-[#D5D0C5] dark:border-[#3D342D]"
+          >
+            <p className="text-sm text-[#594A42] dark:text-[#F5F2EB] text-center">
+              {placesLoading
+                ? "Memuat tempat dari database..."
+                : `Gagal memuat tempat: ${placesLoadError}`}
+            </p>
+          </div>
+        ) : filteredLocations.length === 0 ? (
           /* EMPTY STATE - full width */
           <div className="flex flex-col items-center justify-center py-14 sm:py-20 px-4 bg-white/60 dark:bg-[#2A2521]/60 rounded-3xl border-2 border-dashed border-[#D5D0C5] dark:border-[#3D342D]">
             <FaRegSadTear className="text-5xl sm:text-6xl text-[#8B6B4F]/50 mb-3 sm:mb-4" />
             <h3 className="text-lg sm:text-xl font-bold text-[#594A42] dark:text-[#F5F2EB] text-center">
-              Spot belum ditemukan
+              {places.length === 0 ? "Belum ada tempat aktif" : "Spot belum ditemukan"}
             </h3>
             <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm mt-1.5 sm:mt-2 max-w-sm text-center">
-              Coba ganti kata kunci, pilih kategori lain, atau luaskan ke "Semua
-              Kota".
+              {places.length === 0
+                ? "Database belum memiliki tempat yang aktif."
+                : 'Coba ganti kata kunci, pilih kategori lain, atau luaskan ke "Semua Kota".'}
             </p>
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setActiveCity("Semua Kota");
-                setActiveCategory("Semua");
-                setCanScrollUp(false);
-                setCanScrollDown(true);
-              }}
-              className="mt-5 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 bg-[#594A42] text-white text-xs sm:text-sm font-bold rounded-full hover:bg-[#433731] transition-all cursor-pointer shadow-sm active:scale-95"
-            >
-              Reset Filter Pencarian
-            </button>
+            {places.length > 0 && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setActiveCity("Semua Kota");
+                  setActiveCategory("Semua");
+                  setCanScrollUp(false);
+                  setCanScrollDown(true);
+                }}
+                className="mt-5 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 bg-[#594A42] text-white text-xs sm:text-sm font-bold rounded-full hover:bg-[#433731] transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                Reset Filter Pencarian
+              </button>
+            )}
           </div>
         ) : (
           /* SPLIT LAYOUT: Peta sticky kiri + Kartu scroll kanan (Responsif) */
@@ -686,7 +725,7 @@ export default function Map() {
                           {selectedLocation.colokanProbability}
                         </p>
                         <p className="text-[10px] text-gray-500 mt-0.5 truncate">
-                          {selectedLocation.specs?.plug || "Tersedia"}
+                          {selectedLocation.specs?.plug || "Belum ada data"}
                         </p>
                       </div>
                       <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl">
@@ -697,7 +736,7 @@ export default function Map() {
                           {selectedLocation.wifiStatus}
                         </p>
                         <p className="text-[10px] text-gray-500 mt-0.5 truncate">
-                          {selectedLocation.specs?.wifi || "Stabil"}
+                          {selectedLocation.wifiStatus || "Belum ada data"}
                         </p>
                       </div>
                       <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl col-span-2 md:col-span-1">
@@ -708,7 +747,9 @@ export default function Map() {
                           {selectedLocation.noiseLevel}
                         </p>
                         <p className="text-[10px] text-gray-500 mt-0.5">
-                          {selectedLocation.visitors} Orang di spot
+                          {selectedLocation.visitors == null
+                            ? "Data pengunjung belum tersedia"
+                            : `${selectedLocation.visitors} Orang di spot`}
                         </p>
                       </div>
                     </div>

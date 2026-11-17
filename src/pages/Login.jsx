@@ -12,7 +12,6 @@ import {
   githubProvider,
 } from "../data/firebase";
 import { useTheme } from "../context/ThemeContext";
-import { placesData } from "../data/place";
 import { apiLogin, apiSocialLogin } from "../services/api";
 
 import logoSelasar from "../assets/Logo.png";
@@ -435,27 +434,12 @@ export default function Login() {
     }
   };
 
-  const samplePlaces = placesData.slice(0, 8);
-
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center p-3 sm:p-5 md:p-8 overflow-hidden select-none bg-[#EBE7DF] dark:bg-[#1A1614] transition-colors duration-500">
-      {/* ATMOSPHERIC PINTEREST-LIKE BACKDROP */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30 dark:opacity-20 transition-opacity duration-700">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 transform scale-105 filter blur-sm">
-          {samplePlaces.map((place) => (
-            <div
-              key={place.id}
-              className="rounded-3xl overflow-hidden shadow-lg aspect-square bg-[#8B6B4F]/20"
-            >
-              <img
-                src={place.image}
-                alt={place.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-20 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-[#D9B382] via-transparent to-transparent"
+      />
 
       {/* BACKDROP OVERLAY */}
       <div

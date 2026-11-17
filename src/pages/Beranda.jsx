@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import textLogo from "../assets/text-logo.png";
-import { placesData } from "../data/place";
 import SelasarMap from "../components/SelasarMap";
 import { fetchPlaces, fetchPromos, toggleBookmarkAPI } from "../services/api";
 import {
@@ -25,74 +24,12 @@ import CommunityReviewsSection from "../components/CommunityReviewsSection";
 const FALLBACK_PLACE_IMG =
   "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
 
-const banners = [
-  {
-    id: 1,
-    image:
-      "https://images.unsplash.com/photo-1498654896293-37aacf113fd9?auto=format&fit=crop&w=1000&q=80",
-    title: "Promo Nugas Mahasiswa 🎓",
-    subtitle: "Diskon 30% all item di Ruang Seduh.",
-    detail:
-      "Tunjukin Kartu Tanda Mahasiswa (KTM) kamu ke kasir buat nikmatin diskon 30% untuk semua varian kopi. Cocok banget buat nemenin skripsian sampai pagi! Maksimal diskon Rp 50.000.",
-    brand: "Ruang Seduh",
-  },
-  {
-    id: 2,
-    image:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1000&q=80",
-    title: "Spot Baru di Bogor 🌲",
-    subtitle: "Healing sambil nugas di Kopi Daong.",
-    detail:
-      "Udah suntuk di kamar? Kopi Daong ngasih kamu view hutan pinus yang bikin otak fresh lagi. Free WiFi ngebut khusus pembelian paket Nugas Hemat.",
-    brand: "Kopi Daong",
-  },
-  {
-    id: 3,
-    image:
-      "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1000&q=80",
-    title: "Coworking 24 Jam 🦉",
-    subtitle: "Titik Koma Coffee sekarang buka 24 jam.",
-    detail:
-      "Khusus weekend (Jumat - Minggu), Titik Koma buka 24 jam full. Free refill infused water dan colokan di setiap meja dijamin aman.",
-    brand: "Titik Koma",
-  },
-  {
-    id: 4,
-    image:
-      "https://images.unsplash.com/photo-1525610553991-2bede1a236e2?auto=format&fit=crop&w=1000&q=80",
-    title: "Cashback Gopay 50% 💸",
-    subtitle: "Nugas hemat di Kopi Nalar.",
-    detail:
-      "Pakai kode voucher SELASAR50 di aplikasi Gopay kamu saat bayar di Kopi Nalar Jakarta. Dapatkan cashback instan 50% tanpa minimum pembelian!",
-    brand: "Kopi Nalar",
-  },
-  {
-    id: 5,
-    image:
-      "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=1000&q=80",
-    title: "Live Acoustic Weekend 🎸",
-    subtitle: "Beresin tugas sambil chill di Kisah Manis.",
-    detail:
-      "Nugas nggak harus tegang! Mulai jam 7 malam tiap Sabtu, Kisah Manis Bandung ngadain Live Acoustic. Beli 2 minuman gratis 1 porsi dimsum.",
-    brand: "Kisah Manis",
-  },
-  {
-    id: 6,
-    image:
-      "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1000&q=80",
-    title: "Paket Skripsian Unlimited ☕",
-    subtitle: "Gratis refill kopi hitam seharian.",
-    detail:
-      "Beli Paket Skripsian seharga Rp 45.000, kamu udah dapet 1 pastry dan bebas refill kopi hitam sepuasnya dari buka sampai tutup. Hanya di Bilik Kopi!",
-    brand: "Bilik Kopi",
-  },
-];
-
 const searchHints = [
   "Mau nugas di mana hari ini?",
   "Nyari colokan yang gampang?",
   "Butuh WiFi ngebut buat deadline?",
   "Pengen suasana yang tenang?",
+  "Hi, apa kabar? bagaimana dengan hari mu?"
 ];
 
 const headingTexts = [
@@ -149,10 +86,14 @@ export default function Beranda() {
   const [activeFilter, setActiveFilter] = useState("Show Everything");
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [selectedBanner, setSelectedBanner] = useState(null);
-  const [placesList, setPlacesList] = useState(placesData);
-  const [promoList, setPromoList] = useState(banners);
+  const [placesList, setPlacesList] = useState([]);
+  const [isPlacesLoading, setIsPlacesLoading] = useState(true);
+  const [placesLoadError, setPlacesLoadError] = useState("");
+  const [promoList, setPromoList] = useState([]);
+  const [isPromosLoading, setIsPromosLoading] = useState(true);
+  const [promoLoadError, setPromoLoadError] = useState("");
 
-  const [placeModalTab, setPlaceModalTab] = useState("info"); // "info" | "reviews"
+  const [placeModalTab, setPlaceModalTab] = useState("info");
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewRefreshTrigger, setReviewRefreshTrigger] = useState(0);
   const [currentUser, setCurrentUser] = useState(() => {
@@ -165,25 +106,40 @@ export default function Beranda() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchPlaces().then((data) => {
-      if (isMounted && data && data.length > 0) {
-        setPlacesList(data);
-      }
-    });
-    fetchPromos().then((promos) => {
-      if (isMounted && promos && promos.length > 0) {
+    fetchPlaces()
+      .then((data) => {
+        if (isMounted) setPlacesList(data);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("[Beranda] Gagal memuat tempat dari database:", err);
+        setPlacesLoadError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setIsPlacesLoading(false);
+      });
+    fetchPromos()
+      .then((promos) => {
+        if (!isMounted) return;
         setPromoList(
-          promos.map((p, idx) => ({
-            id: p.id || idx + 1,
-            title: p.title,
-            subtitle: p.subtitle,
-            detail: p.detail,
-            image: p.image_url || banners[idx % banners.length]?.image,
-            brand: p.brand_name || p.place_name || "Selasar",
+          promos.map((promo) => ({
+            id: promo.id,
+            title: promo.title,
+            subtitle: promo.subtitle,
+            detail: promo.detail,
+            image: promo.image_url || FALLBACK_PLACE_IMG,
+            brand: promo.brand_name || promo.place_name || null,
           })),
         );
-      }
-    });
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("[Beranda] Gagal memuat promo dari database:", err);
+        setPromoLoadError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setIsPromosLoading(false);
+      });
     return () => {
       isMounted = false;
     };
@@ -304,7 +260,7 @@ export default function Beranda() {
   };
 
   const handleCarouselScroll = () => {
-    if (!carouselRef.current) return;
+    if (!carouselRef.current || promoList.length === 0) return;
     const { scrollLeft, scrollWidth } = carouselRef.current;
     const slideWidth = scrollWidth / promoList.length;
     const index = Math.round(scrollLeft / slideWidth);
@@ -312,7 +268,7 @@ export default function Beranda() {
   };
 
   const goToSlide = (index) => {
-    if (!carouselRef.current) return;
+    if (!carouselRef.current || promoList.length === 0) return;
     const slideWidth = carouselRef.current.scrollWidth / promoList.length;
     carouselRef.current.scrollTo({
       left: slideWidth * index,
@@ -326,35 +282,6 @@ export default function Beranda() {
     }
   };
 
-  const toggleFavorite = (e, placeId) => {
-    e.stopPropagation();
-    const place = placesList.find((p) => p.id === placeId);
-    toggleFavoriteStore({
-      source: "beranda",
-      id: placeId,
-      name: place?.name,
-      image: place?.image,
-      match: place?.match,
-    });
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(placeId)) next.delete(placeId);
-      else next.add(placeId);
-      return next;
-    });
-
-    // Sinkronkan ke PostgreSQL Backend (selasar-db) jika user login
-    // BUG FIX: gunakan user.uid yang bisa berupa firebase_uid ATAU DB UUID
-    try {
-      const user = JSON.parse(localStorage.getItem("selasarUser") || "{}");
-      const userIdentifier = user?.uid || user?.id;
-      if (userIdentifier) {
-        toggleBookmarkAPI(userIdentifier, placeId).catch(() => {});
-      }
-    } catch {
-      /* ignore */
-    }
-  };
 
   const handleSelectPlace = (place) => {
     logVisit({
@@ -503,16 +430,31 @@ export default function Beranda() {
                 : "opacity-100 scale-100"
             }`}
           >
-            <SelasarMap
-              places={filteredPlaces}
-              activeCity={activeFilter}
-              selectedPlaceId={selectedPlace?.id}
-              onSelectPlace={(place) => handleSelectPlace(place)}
-              mode="preview"
-              onOpenFullMap={() =>
-                handleNavigate("/map", { state: { city: activeFilter } })
-              }
-            />
+            {isPlacesLoading || placesLoadError || placesList.length === 0 ? (
+              <div
+                role={placesLoadError ? "alert" : "status"}
+                className="min-h-72 flex items-center justify-center rounded-3xl bg-white/70 dark:bg-[#2A2521]/70 border border-[#D5D0C5] dark:border-[#3D342D] p-6 text-center"
+              >
+                <p className="text-sm text-[#594A42] dark:text-[#F5F2EB]">
+                  {isPlacesLoading
+                    ? "Memuat tempat dari database..."
+                    : placesLoadError
+                      ? `Gagal memuat tempat: ${placesLoadError}`
+                      : "Belum ada tempat aktif di database."}
+                </p>
+              </div>
+            ) : (
+              <SelasarMap
+                places={filteredPlaces}
+                activeCity={activeFilter}
+                selectedPlaceId={selectedPlace?.id}
+                onSelectPlace={(place) => handleSelectPlace(place)}
+                mode="preview"
+                onOpenFullMap={() =>
+                  handleNavigate("/map", { state: { city: activeFilter } })
+                }
+              />
+            )}
           </div>
 
           <div
@@ -535,7 +477,18 @@ export default function Beranda() {
               className="flex overflow-x-auto hide-scrollbar gap-4 pb-4 cursor-grab active:cursor-grabbing"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              {promoList.map((banner) => (
+              {promoList.length === 0 ? (
+                <div className="w-full min-h-48 md:min-h-52 flex items-center justify-center rounded-3xl bg-[#E5DFCF]/50 dark:bg-[#332C27] shrink-0">
+                  <p className="text-sm text-[#594A42] dark:text-[#F5F2EB]">
+                    {isPromosLoading
+                      ? "Memuat promo..."
+                      : promoLoadError
+                        ? `Gagal memuat promo: ${promoLoadError}`
+                        : "Belum ada promo aktif saat ini."}
+                  </p>
+                </div>
+              ) : (
+                promoList.map((banner) => (
                 <div
                   key={banner.id}
                   onClick={() => handleBannerClick(banner)}
@@ -564,7 +517,8 @@ export default function Beranda() {
                     Promo
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="flex justify-center gap-2 mb-6">
@@ -656,7 +610,7 @@ export default function Beranda() {
               : "opacity-100 translate-y-0"
           }`}
         >
-          {filteredPlaces.length > 0 && (
+          {!isPlacesLoading && !placesLoadError && filteredPlaces.length > 0 && (
             <p className="text-sm text-[#8B6B4F] dark:text-[#C4A876] font-medium mb-4">
               Menampilkan {filteredPlaces.length} tempat
               {activeFilter !== "Show Everything" ? ` di ${activeFilter}` : ""}
@@ -664,7 +618,7 @@ export default function Beranda() {
             </p>
           )}
 
-          {filteredPlaces.length > 0 ? (
+          {isPlacesLoading || placesLoadError ? null : filteredPlaces.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
               {filteredPlaces.map((place, index) => (
                 <RevealOnScroll key={place.id} delay={(index % 3) * 100}>
@@ -703,19 +657,21 @@ export default function Beranda() {
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🔊</span>{" "}
                           <span className="font-medium">
-                            {place.noiseLevel}
+                            {place.noiseLevel || "Belum ada data"}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-lg">📶</span>{" "}
                           <span className="font-medium">
-                            {place.wifiStatus}
+                            {place.wifiStatus || "Belum ada data"}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 col-span-2 border-t border-gray-200 dark:border-[#3D342D] pt-2 mt-1">
                           <span className="text-lg">👥</span>{" "}
                           <span className="font-medium">
-                            {place.visitors} Orang lagi nugas
+                            {place.visitors == null
+                              ? "Data pengunjung belum tersedia"
+                              : `${place.visitors} Orang lagi nugas`}
                           </span>
                         </div>
                       </div>
@@ -727,24 +683,30 @@ export default function Beranda() {
           ) : (
             <div className="flex flex-col items-center justify-center py-16 px-6 bg-white/40 dark:bg-[#2A2521]/40 rounded-3xl border-2 border-dashed border-[#D5D0C5] dark:border-[#3D342D]">
               <div className="text-5xl mb-4">
-                {showFavoritesOnly ? "🔖" : "🔍"}
+                {placesList.length === 0 ? "📍" : showFavoritesOnly ? "🔖" : "🔍"}
               </div>
               <h3 className="text-lg font-bold text-[#594A42] dark:text-[#F5F2EB] mb-2 text-center">
-                {showFavoritesOnly
+                {placesList.length === 0
+                  ? "Belum ada tempat terdaftar"
+                  : showFavoritesOnly
                   ? "Belum ada tempat favorit"
                   : "Belum ada tempat yang cocok"}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center max-w-xs">
-                {showFavoritesOnly
+                {placesList.length === 0
+                  ? "Belum ada tempat aktif di database."
+                  : showFavoritesOnly
                   ? "Tap ikon bookmark di kartu tempat buat nyimpen spot andalan kamu."
                   : "Coba ubah filter kota, atau lihat semua tempat yang tersedia."}
               </p>
-              <button
-                onClick={resetFilters}
-                className="px-6 py-2.5 bg-[#594A42] text-white rounded-full text-sm font-semibold hover:bg-[#433731] active:scale-95 transition-all shadow-sm"
-              >
-                Reset Filter
-              </button>
+              {placesList.length > 0 && (
+                <button
+                  onClick={resetFilters}
+                  className="px-6 py-2.5 bg-[#594A42] text-white rounded-full text-sm font-semibold hover:bg-[#433731] active:scale-95 transition-all shadow-sm"
+                >
+                  Reset Filter
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -846,7 +808,7 @@ export default function Beranda() {
                           WiFi
                         </p>
                         <p className="font-semibold text-xs sm:text-sm">
-                          {selectedPlace.wifiStatus}
+                          {selectedPlace.wifiStatus || "Belum ada data"}
                         </p>
                       </div>
                       <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-3.5 sm:p-4 rounded-2xl">
@@ -854,7 +816,7 @@ export default function Beranda() {
                           🔊 Suasana
                         </p>
                         <p className="font-semibold text-xs sm:text-sm">
-                          {selectedPlace.noiseLevel}
+                          {selectedPlace.noiseLevel || "Belum ada data"}
                         </p>
                       </div>
                       <div className="bg-[#F4EFE8] dark:bg-[#1F1B18] p-3.5 sm:p-4 rounded-2xl">
@@ -863,7 +825,9 @@ export default function Beranda() {
                           Kepadatan
                         </p>
                         <p className="font-semibold text-xs sm:text-sm">
-                          {selectedPlace.visitors} Orang
+                          {selectedPlace.visitors == null
+                            ? "Data pengunjung belum tersedia"
+                            : `${selectedPlace.visitors} Orang`}
                         </p>
                       </div>
                     </div>
@@ -952,9 +916,11 @@ export default function Beranda() {
                 <span className="bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   <FaTag size={10} /> Penawaran Spesial
                 </span>
-                <span className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold border border-[#8B6B4F] dark:border-[#C4A876] px-3 py-1 rounded-full">
-                  {selectedBanner.brand}
-                </span>
+                {selectedBanner.brand && (
+                  <span className="text-[#8B6B4F] dark:text-[#C4A876] text-xs font-bold border border-[#8B6B4F] dark:border-[#C4A876] px-3 py-1 rounded-full">
+                    {selectedBanner.brand}
+                  </span>
+                )}
               </div>
               <h2 className="text-2xl md:text-3xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] mb-2 leading-tight">
                 {selectedBanner.title}
@@ -973,4 +939,4 @@ export default function Beranda() {
       )}
     </div>
   );
-}
+};

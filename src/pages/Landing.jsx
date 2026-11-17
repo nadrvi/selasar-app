@@ -4,7 +4,7 @@ import { useTheme } from "../context/ThemeContext";
 import textLogo from "../assets/text-logo.png";
 import Daun from "../assets/Daun.png";
 import DaunBawah from "../assets/Daun_half.png";
-import { placesData } from "../data/place";
+import { fetchPlaces } from "../services/api";
 import {
   FaPlug,
   FaWifi,
@@ -145,15 +145,44 @@ export default function Landing() {
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [openFaq, setOpenFaq] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const categories = ["Semua", "Quiet Zone", "Buka 24 Jam", "Cafe Aesthetic"];
-  const previewPlaces = placesData.slice(0, 3);
+  const [places, setPlaces] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(true);
+  const [placesLoadError, setPlacesLoadError] = useState("");
+  const categories = [
+    "Semua",
+    ...new Set(places.map((place) => place.category).filter(Boolean)),
+  ];
+  const previewPlaces = places
+    .filter(
+      (place) =>
+        activeCategory === "Semua" || place.category === activeCategory,
+    )
+    .slice(0, 3);
 
   const { darkMode: isDarkMode, toggleDarkMode } = useTheme();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 50);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchPlaces({ sort: "popular" })
+      .then((data) => {
+        if (isMounted) setPlaces(data);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("[Landing] Gagal memuat tempat dari database:", err);
+        setPlacesLoadError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setPlacesLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -524,7 +553,7 @@ export default function Landing() {
           <RevealOnScroll className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
             <div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-[#594A42] dark:text-[#F5F2EB] mb-2">
-                Lagi Rame Dicari Minggu Ini
+                Rekomendasi Tempat dari Database
               </h2>
               <div className="w-16 h-1.5 bg-[#8B6B4F] dark:bg-[#C4A876] rounded-full" />
             </div>
@@ -547,6 +576,20 @@ export default function Landing() {
             </div>
           </RevealOnScroll>
 
+          {placesLoading || placesLoadError || previewPlaces.length === 0 ? (
+            <div
+              role={placesLoadError ? "alert" : "status"}
+              className="rounded-3xl border border-[#D5D0C5] dark:border-[#3D342D] bg-white/70 dark:bg-[#2A2521]/70 p-10 text-center"
+            >
+              <p className="text-sm text-[#594A42] dark:text-[#F5F2EB]">
+                {placesLoading
+                  ? "Memuat tempat dari database..."
+                  : placesLoadError
+                    ? `Gagal memuat tempat: ${placesLoadError}`
+                    : "Belum ada tempat aktif di database."}
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {previewPlaces.map((place, i) => (
               <RevealOnScroll key={place.id} delay={i * 100}>
@@ -577,10 +620,17 @@ export default function Landing() {
 
                     <div className="absolute bottom-3 left-4 flex items-center gap-2 select-none">
                       <span className="px-2 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold">
-                        Buka
+                        {place.is_open_24h
+                          ? "24 Jam"
+                          : place.open_hour && place.close_hour
+                            ? "Jam operasional"
+                            : "Jam belum tersedia"}
                       </span>
                       <span className="text-xs font-semibold text-white flex items-center gap-1">
-                        <FaClock size={11} /> 08:00 - 22:00
+                        <FaClock size={11} />
+                        {place.open_hour && place.close_hour
+                          ? `${place.open_hour} - ${place.close_hour}`
+                          : "Jam belum tersedia"}
                       </span>
                     </div>
                   </div>
@@ -592,7 +642,10 @@ export default function Landing() {
                           {place.name}
                         </h3>
                         <div className="flex items-center gap-1 text-xs font-extrabold text-amber-500 select-none">
-                          <FaStar size={12} /> 4.8
+                          <FaStar size={12} />
+                          {place.avg_rating > 0
+                            ? Number(place.avg_rating).toFixed(1)
+                            : "Belum ada rating"}
                         </div>
                       </div>
 
@@ -604,11 +657,11 @@ export default function Landing() {
                     <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300 font-semibold border-t border-gray-100 dark:border-[#3D342D] pt-4 mt-2">
                       <span className="flex items-center gap-1.5">
                         <FaPlug className="text-[#8B6B4F] dark:text-[#C4A876]" size={13} />
-                        {place.colokanProbability}
+                        {place.colokanProbability || "Belum ada data"}
                       </span>
                       <span className="flex items-center gap-1.5">
                         <FaWifi className="text-[#8B6B4F] dark:text-[#C4A876]" size={13} />
-                        {place.wifiStatus}
+                        {place.wifiStatus || "Belum ada data"}
                       </span>
                     </div>
                   </div>
@@ -616,13 +669,14 @@ export default function Landing() {
               </RevealOnScroll>
             ))}
           </div>
+          )}
 
           <div className="text-center mt-12 select-none">
             <Link
               to="/register"
               className="inline-flex items-center gap-2 px-8 py-3.5 bg-white dark:bg-[#2A2521] rounded-full text-sm font-extrabold text-[#594A42] dark:text-[#F5F2EB] shadow-md hover:shadow-xl border border-white dark:border-[#3D342D] hover:-translate-y-0.5 transition-all"
             >
-              Lihat 500+ Spot Lainnya <FaArrowRight size={12} />
+              Lihat Semua Tempat <FaArrowRight size={12} />
             </Link>
           </div>
         </section>

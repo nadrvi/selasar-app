@@ -14,6 +14,7 @@ promosRouter.get('/', async (c) => {
       FROM promos pr
       LEFT JOIN places p ON p.id = pr.place_id
       WHERE pr.is_active = TRUE
+        AND pr.valid_from <= NOW()
         AND (pr.valid_until IS NULL OR pr.valid_until > NOW())
       ORDER BY pr.sort_order ASC, pr.created_at DESC
     `;
