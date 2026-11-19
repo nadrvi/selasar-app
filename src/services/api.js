@@ -13,6 +13,11 @@ async function fetchAPI(endpoint, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
   let res;
+  const savedToken = localStorage.getItem('authToken');
+  const authToken =
+    savedToken && savedToken !== 'undefined' && savedToken !== 'null'
+      ? savedToken
+      : null;
 
   try {
     res = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -20,6 +25,7 @@ async function fetchAPI(endpoint, options = {}) {
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -105,92 +111,76 @@ export async function fetchPopularPlaces() {
 }
 
 // ============================================================
-//  DATABASE AUTHENTICATION API (POSTGRESQL selasar-db)
+//  FIREBASE AUTHENTICATION API
 // ============================================================
 
 /**
- * Pendaftaran akun baru langsung ke database PostgreSQL (selasar-db)
+ * Simpan profil akun Firebase baru ke PostgreSQL.
  */
-export async function apiRegister({ email, username, password, birthday, display_name }) {
+export async function apiRegister({ id_token, username, birthday, display_name }) {
   return await fetchAPI('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, username, password, birthday, display_name }),
+    body: JSON.stringify({ id_token, username, birthday, display_name }),
   });
 }
 
 /**
- * Masuk/Login langsung memvalidasi ke database PostgreSQL (selasar-db)
+ * Tukarkan Firebase ID token terverifikasi dengan sesi API Selasar.
  */
-export async function apiLogin({ email, password }) {
-  return await fetchAPI('/api/auth/login', {
+export async function apiFirebaseSession({ id_token }) {
+  return await fetchAPI('/api/auth/session', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ id_token }),
   });
 }
 
-/**
- * Simpan / sinkronkan akun Google/Sosial ke database PostgreSQL (selasar-db)
- */
-export async function apiSocialLogin({ firebase_uid, email, display_name, avatar_url }) {
-  return await fetchAPI('/api/auth/social', {
-    method: 'POST',
-    body: JSON.stringify({ firebase_uid, email, display_name, avatar_url }),
-  });
-}
-
-// ============================================================
-//  USERS & AUTH SYNC API
-// ============================================================
-
-/**
- * Sinkronisasi akun Firebase ke database Postgres (users table)
- */
-export async function syncUserProfile({
-  firebase_uid,
-  email,
-  username,
-  display_name,
-  avatar_url,
-  birthday,
-}) {
-  if (!firebase_uid || !email) return null;
-  try {
-    const res = await fetchAPI('/api/users/sync', {
-      method: 'POST',
-      body: JSON.stringify({
-        firebase_uid,
-        email,
-        username,
-        display_name,
-        avatar_url,
-        birthday,
-      }),
-    });
-    return res.data;
-  } catch (err) {
-    console.warn('[Selasar API] User sync background warning:', err.message);
-    return null;
-  }
-}
 
 /**
  * Mengambil profil user lengkap (termasuk badges dan counter)
  */
-export async function fetchUserProfile(firebaseUid) {
-  const res = await fetchAPI(`/api/users/${firebaseUid}/profile`);
+export async function fetchUserProfile(identifier) {
+  if (!identifier) return null;
+  const res = await fetchAPI(`/api/users/${identifier}/profile`);
   if (!res.success) {
     throw new Error(`API_ERROR: ${res.message || 'Gagal memuat profil user'}`);
   }
   return res.data;
 }
 
+/**
+ * Memperbarui profil user (display_name, bio, birthday, avatar_url) langsung ke PostgreSQL
+ */
+export async function updateUserProfile(identifier, profileData) {
+  if (!identifier) return null;
+  return await fetchAPI(`/api/users/${identifier}/profile`, {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  });
+}
+
+/**
+ * Mencatat aktivitas (misal melihat tempat, pencarian) ke tabel activity_logs database
+ */
+export async function logActivityAPI({ place_id, event_type = 'visit', metadata = {} }) {
+  if (!localStorage.getItem('authToken')) return null;
+  try {
+    return await fetchAPI('/api/users/activity', {
+      method: 'POST',
+      body: JSON.stringify({ place_id, event_type, metadata }),
+    });
+  } catch (err) {
+    console.warn('[Selasar API] logActivityAPI warning:', err.message);
+    return null;
+  }
+}
+
+
 // ============================================================
 //  BOOKMARKS / FAVORITES API
 // ============================================================
 
 /**
- * Ambil semua bookmark user dari database.
- * uid bisa berupa firebase_uid (Google/sosial) atau DB UUID (email/password).
+ * Ambil bookmark milik akun yang sedang terautentikasi.
  */
 export async function fetchUserBookmarks(uid) {
   if (!uid) return [];
@@ -205,9 +195,7 @@ export async function fetchUserBookmarks(uid) {
 }
 
 /**
- * Toggle bookmark on/off untuk sebuah tempat.
- * uid: bisa firebase_uid (Google) ATAU DB UUID (email/password login).
- * Backend sekarang mendukung kedua tipe uid.
+ * Toggle bookmark on/off untuk sebuah tempat milik akun yang terautentikasi.
  */
 export async function toggleBookmarkAPI(uid, placeId, note = null) {
   if (!uid || !placeId) {
@@ -218,7 +206,6 @@ export async function toggleBookmarkAPI(uid, placeId, note = null) {
     const res = await fetchAPI('/api/bookmarks/toggle', {
       method: 'POST',
       body: JSON.stringify({
-        uid,          // field universal, backend mendeteksi firebase_uid vs UUID
         place_id: placeId,
         note,
       }),
@@ -231,7 +218,7 @@ export async function toggleBookmarkAPI(uid, placeId, note = null) {
 }
 
 /**
- * Cek apakah satu tempat sudah di-bookmark oleh user tertentu.
+ * Cek apakah tempat sudah di-bookmark oleh akun yang terautentikasi.
  */
 export async function checkBookmarkAPI(uid, placeId) {
   if (!uid || !placeId) return false;
@@ -246,11 +233,8 @@ export async function checkBookmarkAPI(uid, placeId) {
 //  REVIEWS API (COMMUNITY REVIEWS)
 // ============================================================
 
-export async function fetchPlaceReviews(placeId, sort = 'latest', userIdOrUid = null) {
-  let queryParam = `?sort=${sort}`;
-  if (userIdOrUid) {
-    queryParam += `&user_id=${encodeURIComponent(userIdOrUid)}&firebase_uid=${encodeURIComponent(userIdOrUid)}`;
-  }
+export async function fetchPlaceReviews(placeId, sort = 'latest') {
+  const queryParam = `?sort=${sort}`;
   const res = await fetchAPI(`/api/reviews/place/${placeId}${queryParam}`);
   if (!res.success) {
     throw new Error(`API_ERROR: ${res.message || 'Gagal memuat ulasan'}`);
@@ -262,19 +246,20 @@ export async function fetchPlaceReviews(placeId, sort = 'latest', userIdOrUid = 
 }
 
 export async function submitPlaceReview(reviewData) {
+  const review = { ...reviewData };
+  for (const identityField of ['user_id', 'firebase_uid', 'email', 'uid']) {
+    delete review[identityField];
+  }
   return await fetchAPI('/api/reviews', {
     method: 'POST',
-    body: JSON.stringify(reviewData),
+    body: JSON.stringify(review),
   });
 }
 
-export async function toggleReviewHelpfulAPI(reviewId, userIdOrUid) {
+export async function toggleReviewHelpfulAPI(reviewId) {
   return await fetchAPI(`/api/reviews/${reviewId}/helpful`, {
     method: 'POST',
-    body: JSON.stringify({ 
-      user_id: userIdOrUid,
-      firebase_uid: userIdOrUid 
-    }),
+    body: JSON.stringify({}),
   });
 }
 
@@ -290,22 +275,29 @@ export async function fetchActiveCheckins(placeId) {
   return res;
 }
 
-export async function checkinToPlace(firebaseUid, placeId, note = '') {
+export async function fetchUserActiveCheckin(identifier) {
+  if (!identifier) return null;
+  const res = await fetchAPI(`/api/checkins/user/${identifier}`);
+  if (!res.success) {
+    return null;
+  }
+  return res.active_checkin;
+}
+
+export async function checkinToPlace(identifier, placeId, note = '') {
   return await fetchAPI('/api/checkins/in', {
     method: 'POST',
     body: JSON.stringify({
-      firebase_uid: firebaseUid,
       place_id: placeId,
       note,
     }),
   });
 }
 
-export async function checkoutFromPlace(firebaseUid, placeId) {
+export async function checkoutFromPlace(identifier, placeId) {
   return await fetchAPI('/api/checkins/out', {
     method: 'POST',
     body: JSON.stringify({
-      firebase_uid: firebaseUid,
       place_id: placeId,
     }),
   });

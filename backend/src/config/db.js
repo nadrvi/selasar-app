@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import process from 'node:process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -30,7 +31,11 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[PostgreSQL Pool Error]:', err.message);
+  console.error(JSON.stringify({
+    event: 'db.pool.error',
+    code: err.code || 'UNKNOWN',
+    errorType: err.name || 'Error',
+  }));
 });
 
 /**
@@ -47,7 +52,11 @@ export const query = async (text, params) => {
     }
     return res;
   } catch (error) {
-    console.error('[SQL Execution Error]:', error.message);
+    console.error(JSON.stringify({
+      event: 'db.query.error',
+      code: error.code || 'UNKNOWN',
+      errorType: error.name || 'Error',
+    }));
     throw error;
   }
 };

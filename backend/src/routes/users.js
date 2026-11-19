@@ -1,98 +1,14 @@
 import { Hono } from 'hono';
 import { query } from '../config/db.js';
-import { resolveUser, sanitizeUser } from '../utils/userResolver.js';
+import { resolveUser } from '../utils/userResolver.js';
 
 export const usersRouter = new Hono();
 
-// POST /api/users/sync - Sync or register user profile from Firebase/Social Auth
-usersRouter.post('/sync', async (c) => {
-  try {
-    const { firebase_uid, email, username, display_name, avatar_url, birthday } = await c.req.json();
-
-    if (!firebase_uid && !email) {
-      return c.json({ success: false, message: 'firebase_uid atau email wajib disertakan' }, 400);
-    }
-
-    const cleanEmail = email ? String(email).trim().toLowerCase() : null;
-
-    // Cek apakah user sudah ada berdasarkan email atau firebase_uid
-    let existingUser = null;
-    if (firebase_uid) {
-      const byFb = await query('SELECT * FROM users WHERE firebase_uid = $1', [firebase_uid]);
-      if (byFb.rows.length > 0) existingUser = byFb.rows[0];
-    }
-    if (!existingUser && cleanEmail) {
-      const byEmail = await query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
-      if (byEmail.rows.length > 0) existingUser = byEmail.rows[0];
-    }
-
-    if (existingUser) {
-      // Update record yang sudah ada
-      const updateRes = await query(`
-        UPDATE users SET
-          firebase_uid = COALESCE($1, users.firebase_uid),
-          display_name = COALESCE($2, users.display_name),
-          avatar_url = COALESCE($3, users.avatar_url),
-          birthday = COALESCE($4, users.birthday),
-          last_login_at = NOW(),
-          updated_at = NOW()
-        WHERE id = $5
-        RETURNING *
-      `, [
-        firebase_uid || null,
-        display_name || null,
-        avatar_url || null,
-        birthday || null,
-        existingUser.id,
-      ]);
-
-      return c.json({
-        success: true,
-        message: 'Profil user berhasil disinkronkan',
-        data: sanitizeUser(updateRes.rows[0]),
-      });
-    }
-
-    // User baru: buat candidate username aman
-    let base = (username || cleanEmail?.split('@')[0] || 'user')
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, '')
-      .slice(0, 20);
-
-    if (base.length < 3) base = `user_${base}`;
-
-    let finalUsername = base;
-    const clash = await query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [finalUsername]);
-    if (clash.rows.length > 0) {
-      finalUsername = `${base.slice(0, 15)}_${Math.floor(1000 + Math.random() * 9000)}`;
-    }
-
-    const insertSql = `
-      INSERT INTO users (
-        firebase_uid, email, username, display_name, avatar_url, birthday, last_login_at, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), NOW())
-      RETURNING *
-    `;
-
-    const result = await query(insertSql, [
-      firebase_uid || null,
-      cleanEmail,
-      finalUsername,
-      display_name || finalUsername,
-      avatar_url || null,
-      birthday || null,
-    ]);
-
-    return c.json({
-      success: true,
-      message: 'User sync berhasil didaftarkan',
-      data: sanitizeUser(result.rows[0]),
-    }, 201);
-  } catch (err) {
-    console.error('Error syncing user:', err);
-    return c.json({ success: false, message: err.message }, 500);
-  }
-});
+// Firebase identities are linked only through /api/auth/session after token verification.
+usersRouter.post('/sync', (c) => c.json({
+  success: false,
+  message: 'Endpoint sync lama sudah dinonaktifkan. Gunakan login sosial yang terverifikasi.',
+}, 410));
 
 // GET /api/users/:identifier/profile - Get user profile + badges + stats (supports firebase_uid OR UUID)
 usersRouter.get('/:identifier/profile', async (c) => {
@@ -145,7 +61,6 @@ usersRouter.get('/:identifier/profile', async (c) => {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
-
 // PUT /api/users/:identifier/profile - Update user profile (name, bio, birthday, avatar)
 usersRouter.put('/:identifier/profile', async (c) => {
   try {
@@ -158,24 +73,40 @@ usersRouter.put('/:identifier/profile', async (c) => {
 
     const { display_name, bio, birthday, avatar_url } = await c.req.json();
 
+    const fields = [];
+    const values = [];
+
+    if (display_name !== undefined) {
+      values.push(display_name);
+      fields.push(`display_name = $${values.length}`);
+    }
+    if (bio !== undefined) {
+      values.push(bio);
+      fields.push(`bio = $${values.length}`);
+    }
+    if (birthday !== undefined) {
+      values.push(birthday);
+      fields.push(`birthday = $${values.length}`);
+    }
+    if (avatar_url !== undefined) {
+      values.push(avatar_url);
+      fields.push(`avatar_url = $${values.length}`);
+    }
+
+    if (fields.length === 0) {
+      return c.json({ success: true, message: 'Tidak ada perubahan', data: user });
+    }
+
+    values.push(user.id);
     const updateSql = `
       UPDATE users SET
-        display_name = COALESCE($1, display_name),
-        bio = COALESCE($2, bio),
-        birthday = COALESCE($3, birthday),
-        avatar_url = COALESCE($4, avatar_url),
+        ${fields.join(', ')},
         updated_at = NOW()
-      WHERE id = $5
+      WHERE id = $${values.length}
       RETURNING id, username, email, display_name, avatar_url, bio, birthday, role, updated_at
     `;
 
-    const res = await query(updateSql, [
-      display_name || null,
-      bio || null,
-      birthday || null,
-      avatar_url || null,
-      user.id,
-    ]);
+    const res = await query(updateSql, values);
 
     return c.json({
       success: true,
@@ -184,5 +115,61 @@ usersRouter.put('/:identifier/profile', async (c) => {
     });
   } catch (err) {
     return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+// POST /api/users/activity - Record visit / view activity to activity_logs table
+usersRouter.post('/activity', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { place_id, event_type = 'visit', metadata } = body || {};
+    const user = c.get('authUser');
+    if (!user) return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+
+    if (typeof event_type !== 'string' || event_type.length > 50) {
+      return c.json({ success: false, message: 'Jenis aktivitas tidak valid.' }, 400);
+    }
+
+    let placeIdNum = null;
+    if (place_id != null) {
+      const placeIdString = String(place_id);
+      const parsedPlaceId = Number(placeIdString);
+      if (!/^\d+$/.test(placeIdString) || !Number.isSafeInteger(parsedPlaceId) || parsedPlaceId < 1) {
+        return c.json({ success: false, message: 'place_id tidak valid.' }, 400);
+      }
+      placeIdNum = parsedPlaceId;
+    }
+
+    let metaObj = null;
+    if (metadata != null) {
+      if (typeof metadata !== 'object' || Array.isArray(metadata)) {
+        return c.json({ success: false, message: 'Metadata aktivitas tidak valid.' }, 400);
+      }
+      metaObj = JSON.stringify(metadata);
+      if (metaObj.length > 4096) {
+        return c.json({ success: false, message: 'Metadata aktivitas terlalu besar.' }, 413);
+      }
+    }
+
+    const sql = `
+      INSERT INTO activity_logs (user_id, place_id, event_type, metadata)
+      VALUES ($1, $2, $3, $4::jsonb)
+      RETURNING id, user_id, place_id, event_type, created_at
+    `;
+
+    const res = await query(sql, [user.id, placeIdNum, event_type, metaObj]);
+
+    return c.json({
+      success: true,
+      message: 'Aktivitas berhasil dicatat ke database.',
+      data: res.rows[0],
+    });
+  } catch (err) {
+    console.error(JSON.stringify({
+      event: 'activity_log.error',
+      requestId: c.get('requestId') || null,
+      code: err.code || 'UNKNOWN',
+    }));
+    return c.json({ success: false, message: 'Gagal mencatat aktivitas.' }, 500);
   }
 });

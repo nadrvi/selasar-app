@@ -47,9 +47,30 @@ AWS_REGION="ap-southeast-1"
 S3_BUCKET_NAME="selasar-assets"
 
 CLIENT_URL="http://localhost:5173"
+
+# Authentication
+# Generate a persistent secret with:
+# node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+AUTH_TOKEN_SECRET=""
+FIREBASE_PROJECT_ID="loginprojectregister"
 ```
 
 > **Catatan:** Ganti `YOUR_PASSWORD` dan hostname Neon di `DATABASE_URL` dengan credential connection string Neon DB kamu.
+
+`AUTH_TOKEN_SECRET` wajib diisi dengan secret acak minimal 32 byte di production.
+Firebase Auth adalah sumber kebenaran untuk login email/password, verifikasi,
+reset, dan perubahan kata sandi. Backend tidak memeriksa atau menyimpan password;
+registrasi meminta Firebase ID token dan login menukarkan token terverifikasi
+melalui `POST /api/auth/session`. Token sesi API berlaku 12 jam.
+Semua endpoint yang mengubah data serta endpoint profil/bookmark/check-in pribadi
+membutuhkan `Authorization: Bearer <token>`; identitas perubahan diambil dari token,
+bukan dari ID user yang dikirim client.
+
+Sebelum deploy, jalankan `npm run migrate:secure-seed-accounts` pada database yang
+sudah pernah memakai seed lama. Migrasi ini menonaktifkan hanya akun seed yang
+terdaftar dengan ID/email seed lama; file SQL seed baru juga tidak membuat akun
+demo/admin yang dapat login. Jalankan juga `npm run migrate:clear-legacy-password-hashes`
+untuk menghapus hash password PostgreSQL lama yang tidak lagi dipakai.
 
 ---
 
@@ -73,31 +94,37 @@ CLIENT_URL="http://localhost:5173"
 - `GET /` — Cek status server API
 - `GET /health/db` — Tes koneksi ke database `selasar-db`
 
-### 2. Places (Spot Nugas)
+### 2. Authentication
+- `POST /api/auth/register` — Simpan profil setelah Firebase membuat akun
+- `POST /api/auth/session` — Tukar Firebase ID token terverifikasi dengan token API
+- `POST /api/auth/login` — Endpoint lama; login password backend sudah dinonaktifkan
+- `POST /api/auth/change-password` — Endpoint lama; perubahan password dilakukan di Firebase
+
+### 3. Places (Spot Nugas)
 - `GET /api/places` — Ambil semua spot (support query: `?city=Jakarta&category=Cafe&mood=Fokus&q=nalar&sort=rating`)
 - `GET /api/places/popular` — Top spot populer berdasarkan skor gabungan
 - `GET /api/places/:id` — Detail spot (berdasarkan ID atau Slug)
 
-### 3. Reviews & Ratings
+### 4. Reviews & Ratings
 - `GET /api/reviews/place/:placeId` — Ambil seluruh ulasan & ringkasan bintang
 - `POST /api/reviews` — Tambah / edit ulasan dengan sub-rating (WiFi, suasana, colokan, harga)
 - `POST /api/reviews/:id/helpful` — Toggle voting "Ulasan ini membantu"
 
-### 4. Bookmarks (Favorit)
+### 5. Bookmarks (Favorit)
 - `GET /api/bookmarks/:firebaseUid` — Ambil daftar spot yang disimpan oleh user
 - `POST /api/bookmarks/toggle` — Simpan atau hapus spot favorit
 
-### 5. Check-ins Realtime
+### 6. Check-ins Realtime
 - `GET /api/checkins/place/:placeId` — Daftar pengunjung yang sedang aktif nugas
 - `POST /api/checkins/in` — Check-in ke spot
 - `POST /api/checkins/out` — Check-out dari spot
 
-### 6. Users & Gamification
-- `POST /api/users/sync` — Sinkronisasi akun saat user login/register di frontend
+### 7. Users & Gamification
+- `POST /api/users/sync` — Endpoint lama; sinkronisasi akun langsung dinonaktifkan
 - `GET /api/users/:firebaseUid/profile` — Profil lengkap, statistik & badge yang diraih
 
-### 7. File Storage (Neon S3)
+### 8. File Storage (Neon S3)
 - `POST /api/storage/presigned-url` — Request URL upload langsung client-ke-S3 untuk foto ulasan atau avatar
 
-### 8. Promos
+### 9. Promos
 - `GET /api/promos` — Banner promo dan event aktif

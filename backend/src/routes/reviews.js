@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { query } from '../config/db.js';
-import { resolveUser } from '../utils/userResolver.js';
 
 export const reviewsRouter = new Hono();
 
@@ -8,7 +7,7 @@ export const reviewsRouter = new Hono();
 reviewsRouter.get('/place/:placeId', async (c) => {
   try {
     const placeId = c.req.param('placeId');
-    const { sort = 'latest', user_id, firebase_uid } = c.req.query();
+    const { sort = 'latest' } = c.req.query();
 
     let order = 'r.created_at DESC';
     if (sort === 'highest') order = 'r.rating DESC';
@@ -50,7 +49,7 @@ reviewsRouter.get('/place/:placeId', async (c) => {
 
     // Check which reviews the requester found helpful
     let helpfulSet = new Set();
-    const currentUser = await resolveUser({ user_id, firebase_uid });
+    const currentUser = c.get('authUser');
     if (currentUser && reviews.length > 0) {
       const helpfulRes = await query(
         'SELECT review_id FROM review_helpful WHERE user_id = $1 AND review_id = ANY($2::uuid[])',
@@ -159,9 +158,6 @@ reviewsRouter.post('/', async (c) => {
     const body = await c.req.json();
     const {
       place_id,
-      user_id,
-      firebase_uid,
-      email,
       rating,
       rating_wifi,
       rating_ambience,
@@ -183,18 +179,14 @@ reviewsRouter.post('/', async (c) => {
     } = body;
 
     const numRating = Number(rating);
-    if (!place_id || (!firebase_uid && !user_id && !email) || !numRating || numRating < 1 || numRating > 5) {
+    const user = c.get('authUser');
+    if (!place_id || !user || !numRating || numRating < 1 || numRating > 5) {
       return c.json({ 
         success: false, 
-        message: 'place_id, identitas user (user_id/firebase_uid/email), dan rating (1–5) wajib diisi' 
+        message: 'place_id dan rating (1–5) wajib diisi.'
       }, 400);
     }
 
-    // Lookup user by user_id, firebase_uid, or email
-    const user = await resolveUser({ user_id, firebase_uid, email, uid: body.uid });
-    if (!user) {
-      return c.json({ success: false, message: 'User belum terdaftar di database Selasar' }, 404);
-    }
     const userId = user.id;
 
     // Ensure safety_tags is an array of strings
@@ -304,10 +296,8 @@ reviewsRouter.post('/', async (c) => {
 reviewsRouter.post('/:id/helpful', async (c) => {
   try {
     const reviewId = c.req.param('id');
-    const { uid, firebase_uid, user_id, email } = await c.req.json();
-
-    const user = await resolveUser({ user_id, firebase_uid, email, uid });
-    if (!user) return c.json({ success: false, message: 'User tidak valid atau belum masuk' }, 401);
+    const user = c.get('authUser');
+    if (!user) return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
     const userId = user.id;
 
     const exist = await query('SELECT 1 FROM review_helpful WHERE review_id = $1 AND user_id = $2', [reviewId, userId]);

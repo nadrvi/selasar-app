@@ -6,7 +6,10 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "node --watch --env-file=.env src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "migrate:secure-seed-accounts": "node src/migrations/secure_seed_accounts.js",
+    "migrate:clear-legacy-password-hashes": "node src/migrations/clear_legacy_password_hashes.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",

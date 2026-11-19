@@ -65,25 +65,14 @@ bookmarksRouter.get('/:uid', async (c) => {
 bookmarksRouter.post('/toggle', async (c) => {
   try {
     const body = await c.req.json();
-    const { uid, firebase_uid, user_id, place_id, note } = body;
+    const { place_id, note } = body || {};
+    const user = c.get('authUser');
 
-    // Terima berbagai field name dari frontend (uid, firebase_uid, atau user_id)
-    const identifier = uid || firebase_uid || user_id;
-
-    if (!identifier || !place_id) {
+    if (!user || !Number.isInteger(Number(place_id)) || Number(place_id) < 1) {
       return c.json({
         success: false,
-        message: 'uid/firebase_uid dan place_id wajib disertakan',
+        message: 'place_id valid wajib disertakan.',
       }, 400);
-    }
-
-    // Resolve user dari berbagai identifier type
-    const user = await resolveUser(String(identifier));
-    if (!user) {
-      return c.json({
-        success: false,
-        message: 'User tidak ditemukan. Pastikan sudah login terlebih dahulu.',
-      }, 404);
     }
 
     const userId = user.id;

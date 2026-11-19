@@ -19,6 +19,8 @@ import {
   FaChevronUp,
   FaChevronDown,
   FaPen,
+  FaCheckCircle,
+  FaDoorOpen,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import SelasarMap from "../components/SelasarMap";
@@ -29,7 +31,15 @@ import {
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
-import { fetchPlaces, toggleBookmarkAPI } from "../services/api";
+import {
+  fetchPlaces,
+  toggleBookmarkAPI,
+  checkinToPlace,
+  checkoutFromPlace,
+  fetchUserActiveCheckin,
+  logActivityAPI,
+} from "../services/api";
+
 
 const FALLBACK_PLACE_IMG =
   "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
@@ -49,6 +59,9 @@ export default function Map() {
   const [modalTab, setModalTab] = useState("info"); // "info" | "reviews"
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewRefreshTrigger, setReviewRefreshTrigger] = useState(0);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [isCheckinLoading, setIsCheckinLoading] = useState(false);
+  const [checkinMessage, setCheckinMessage] = useState("");
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("selasarUser") || "null");
@@ -56,6 +69,23 @@ export default function Map() {
       return null;
     }
   });
+
+  useEffect(() => {
+    if (!selectedLocation) {
+      setIsCheckedIn(false);
+      setCheckinMessage("");
+      return;
+    }
+    const userIdentifier = currentUser?.id || currentUser?.uid || currentUser?.email;
+    if (userIdentifier) {
+      fetchUserActiveCheckin(userIdentifier)
+        .then((active) => {
+          setIsCheckedIn(active && Number(active.place_id) === Number(selectedLocation.id));
+        })
+        .catch(() => {});
+    }
+  }, [selectedLocation, currentUser]);
+
 
   // Initial city from navigation state (e.g. from Beranda)
   const [activeCity, setActiveCity] = useState(() => {
@@ -173,11 +203,24 @@ export default function Map() {
       subtitle: loc.address,
       match: loc.match,
     });
+    let user = null;
     try {
-      setCurrentUser(JSON.parse(localStorage.getItem("selasarUser") || "null"));
+      user = JSON.parse(localStorage.getItem("selasarUser") || "null");
+      setCurrentUser(user);
     } catch {
       /* ignore */
     }
+
+    const userIdentifier = user?.id || user?.uid || user?.email;
+    if (userIdentifier) {
+      logActivityAPI({
+        uid: userIdentifier,
+        place_id: loc.id,
+        event_type: "visit",
+        metadata: { source: "map", place_name: loc.name },
+      }).catch(() => {});
+    }
+
     setModalTab("info");
     setSelectedLocation(loc);
     setHighlightedId(loc.id);
@@ -189,6 +232,42 @@ export default function Map() {
       });
     }
   }, []);
+
+  const handleCheckinToggle = async () => {
+    const userIdentifier = currentUser?.id || currentUser?.uid || currentUser?.email;
+    if (!userIdentifier) {
+      setCheckinMessage("Silakan masuk/login terlebih dahulu untuk check-in.");
+      return;
+    }
+
+    if (!selectedLocation) return;
+
+    setIsCheckinLoading(true);
+    setCheckinMessage("");
+
+    try {
+      if (isCheckedIn) {
+        await checkoutFromPlace(userIdentifier, selectedLocation.id);
+        setIsCheckedIn(false);
+        setCheckinMessage("Check-out berhasil! Terima kasih sudah nugas di sini.");
+        setSelectedLocation((prev) =>
+          prev ? { ...prev, visitors: Math.max(0, (prev.visitors || 1) - 1) } : null,
+        );
+      } else {
+        await checkinToPlace(userIdentifier, selectedLocation.id);
+        setIsCheckedIn(true);
+        setCheckinMessage("Check-in berhasil! Selamat nugas di sini ☕");
+        setSelectedLocation((prev) =>
+          prev ? { ...prev, visitors: (prev.visitors || 0) + 1 } : null,
+        );
+      }
+    } catch (err) {
+      setCheckinMessage(err.message || "Gagal memperbarui status check-in.");
+    } finally {
+      setIsCheckinLoading(false);
+    }
+  };
+
 
   const handleFocusOnMap = (loc) => {
     setHighlightedId(loc.id);
@@ -766,7 +845,29 @@ export default function Map() {
               </div>
 
               <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={handleCheckinToggle}
+                    disabled={isCheckinLoading}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-all shadow-md active:scale-95 ${
+                      isCheckedIn
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : "bg-[#8B6B4F] text-white hover:bg-[#735840]"
+                    }`}
+                  >
+                    {isCheckinLoading ? (
+                      "Memproses..."
+                    ) : isCheckedIn ? (
+                      <>
+                        <FaCheckCircle /> Sedang Nugas (Check-out)
+                      </>
+                    ) : (
+                      <>
+                        <FaDoorOpen /> Check-in di Spot Ini
+                      </>
+                    )}
+                  </button>
+
                   <button
                     onClick={() => handleOpenRoute(selectedLocation)}
                     className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-[#594A42] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md hover:shadow-lg cursor-pointer"
@@ -797,6 +898,11 @@ export default function Map() {
                   </div>
                 </div>
               </div>
+              {checkinMessage && (
+                <p className="mt-2 text-xs text-center sm:text-left font-medium text-[#8B6B4F] dark:text-[#C4A876]">
+                  {checkinMessage}
+                </p>
+              )}
             </div>
           </div>
         </div>

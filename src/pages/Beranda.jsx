@@ -2,7 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import textLogo from "../assets/text-logo.png";
 import SelasarMap from "../components/SelasarMap";
-import { fetchPlaces, fetchPromos, toggleBookmarkAPI } from "../services/api";
+import {
+  fetchPlaces,
+  fetchPromos,
+  toggleBookmarkAPI,
+  checkinToPlace,
+  checkoutFromPlace,
+  fetchUserActiveCheckin,
+  logActivityAPI,
+} from "../services/api";
 import {
   logVisit,
   toggleFavorite as toggleFavoriteStore,
@@ -17,7 +25,12 @@ import {
   FaTag,
   FaCog,
   FaSearch,
+  FaBookmark,
+  FaRegBookmark,
+  FaCheckCircle,
+  FaDoorOpen,
 } from "react-icons/fa";
+
 import CommunityReviewModal from "../components/CommunityReviewModal";
 import CommunityReviewsSection from "../components/CommunityReviewsSection";
 
@@ -29,7 +42,7 @@ const searchHints = [
   "Nyari colokan yang gampang?",
   "Butuh WiFi ngebut buat deadline?",
   "Pengen suasana yang tenang?",
-  "Hi, apa kabar? bagaimana dengan hari mu?"
+  "Nongkrong sama temen yokks"
 ];
 
 const headingTexts = [
@@ -165,15 +178,95 @@ export default function Beranda() {
   const [favorites, setFavorites] = useState(() => {
     try {
       return new Set(
-        getStoredFavorites()
-          .filter((f) => f.source === "beranda")
-          .map((f) => f.id),
+        getStoredFavorites().map((f) => Number(f.id)),
       );
     } catch {
       return new Set();
     }
   });
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [isCheckinLoading, setIsCheckinLoading] = useState(false);
+  const [checkinMessage, setCheckinMessage] = useState("");
+
+  useEffect(() => {
+    if (!selectedPlace) {
+      setIsCheckedIn(false);
+      setCheckinMessage("");
+      return;
+    }
+    const userIdentifier = currentUser?.id || currentUser?.uid || currentUser?.email;
+    if (userIdentifier) {
+      fetchUserActiveCheckin(userIdentifier)
+        .then((active) => {
+          setIsCheckedIn(active && Number(active.place_id) === Number(selectedPlace.id));
+        })
+        .catch(() => {});
+    }
+  }, [selectedPlace, currentUser]);
+
+  const handleToggleFavorite = (place, e) => {
+    e?.stopPropagation();
+    if (!place) return;
+
+    toggleFavoriteStore({
+      source: "beranda",
+      id: place.id,
+      name: place.name,
+      image: place.image,
+      match: place.match,
+    });
+
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(place.id)) next.delete(place.id);
+      else next.add(place.id);
+      return next;
+    });
+
+    // Sinkronkan langsung ke database PostgreSQL (bookmarks table)
+    const userIdentifier = currentUser?.id || currentUser?.uid || currentUser?.email;
+    if (userIdentifier) {
+      toggleBookmarkAPI(userIdentifier, place.id).catch((err) => {
+        console.warn("[Beranda] Toggle bookmark DB error:", err.message);
+      });
+    }
+  };
+
+  const handleCheckinToggle = async () => {
+    const userIdentifier = currentUser?.id || currentUser?.uid || currentUser?.email;
+    if (!userIdentifier) {
+      setCheckinMessage("Silakan masuk/login terlebih dahulu untuk check-in.");
+      return;
+    }
+
+    if (!selectedPlace) return;
+
+    setIsCheckinLoading(true);
+    setCheckinMessage("");
+
+    try {
+      if (isCheckedIn) {
+        await checkoutFromPlace(userIdentifier, selectedPlace.id);
+        setIsCheckedIn(false);
+        setCheckinMessage("Check-out berhasil! Terima kasih sudah nugas di sini.");
+        setSelectedPlace((prev) =>
+          prev ? { ...prev, visitors: Math.max(0, (prev.visitors || 1) - 1) } : null,
+        );
+      } else {
+        await checkinToPlace(userIdentifier, selectedPlace.id);
+        setIsCheckedIn(true);
+        setCheckinMessage("Check-in berhasil! Selamat nugas di sini ☕");
+        setSelectedPlace((prev) =>
+          prev ? { ...prev, visitors: (prev.visitors || 0) + 1 } : null,
+        );
+      }
+    } catch (err) {
+      setCheckinMessage(err.message || "Gagal memperbarui status check-in.");
+    } finally {
+      setIsCheckinLoading(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 30);
@@ -292,11 +385,25 @@ export default function Beranda() {
       subtitle: place.city,
       match: place.match,
     });
+    let user = null;
     try {
-      setCurrentUser(JSON.parse(localStorage.getItem("selasarUser") || "null"));
+      user = JSON.parse(localStorage.getItem("selasarUser") || "null");
+      setCurrentUser(user);
     } catch {
       /* ignore */
     }
+
+    // Catat log kunjungan ke PostgreSQL activity_logs
+    const userIdentifier = user?.id || user?.uid || user?.email;
+    if (userIdentifier) {
+      logActivityAPI({
+        uid: userIdentifier,
+        place_id: place.id,
+        event_type: "visit",
+        metadata: { source: "beranda", place_name: place.name },
+      }).catch(() => {});
+    }
+
     setPlaceModalTab("info");
     setSelectedPlace(place);
   };
@@ -640,6 +747,21 @@ export default function Beranda() {
                       <div className="absolute top-4 left-4 bg-white/90 dark:bg-[#2A2521]/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-[#594A42] dark:text-[#F5F2EB] shadow-sm uppercase tracking-wider">
                         {place.city}
                       </div>
+                      <button
+                        onClick={(e) => handleToggleFavorite(place, e)}
+                        aria-label="Simpan favorit"
+                        className={`absolute top-4 right-4 p-2.5 rounded-full backdrop-blur-md transition-all duration-300 shadow-md ${
+                          favorites.has(place.id)
+                            ? "bg-[#594A42] text-white scale-105"
+                            : "bg-white/85 dark:bg-[#2A2521]/85 text-[#594A42] dark:text-[#F5F2EB] hover:scale-110"
+                        }`}
+                      >
+                        {favorites.has(place.id) ? (
+                          <FaBookmark size={14} />
+                        ) : (
+                          <FaRegBookmark size={14} />
+                        )}
+                      </button>
                     </div>
                     <div className="p-6 flex flex-col flex-1">
                       <div className="flex justify-between items-start mb-3">
@@ -748,10 +870,25 @@ export default function Beranda() {
             </div>
             <div className="flex-1 p-6 md:p-8 flex flex-col justify-between overflow-y-auto">
               <div>
-                <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="flex items-start justify-between gap-3 mb-1 pr-10">
                   <h2 className="text-2xl sm:text-3xl font-bold text-[#5E4B45] dark:text-[#F5F2EB]">
                     {selectedPlace.name}
                   </h2>
+                  <button
+                    onClick={(e) => handleToggleFavorite(selectedPlace, e)}
+                    aria-label="Simpan favorit"
+                    className={`p-2 rounded-full transition-all duration-300 cursor-pointer ${
+                      favorites.has(selectedPlace.id)
+                        ? "text-[#8B6B4F] dark:text-[#C4A876]"
+                        : "text-gray-400 hover:text-[#8B6B4F] dark:hover:text-[#C4A876]"
+                    }`}
+                  >
+                    {favorites.has(selectedPlace.id) ? (
+                      <FaBookmark size={22} />
+                    ) : (
+                      <FaRegBookmark size={22} />
+                    )}
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 font-medium mb-3">
                   {selectedPlace.overthinkingStatus}
@@ -845,6 +982,28 @@ export default function Beranda() {
 
               <div className="mt-6 pt-5 border-t border-gray-100 dark:border-[#3D342D] flex flex-col sm:flex-row justify-between items-center gap-3">
                 <button
+                  onClick={handleCheckinToggle}
+                  disabled={isCheckinLoading}
+                  className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-xs sm:text-sm cursor-pointer transition-all shadow-md active:scale-95 ${
+                    isCheckedIn
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "bg-[#8B6B4F] text-white hover:bg-[#735840]"
+                  }`}
+                >
+                  {isCheckinLoading ? (
+                    "Memproses..."
+                  ) : isCheckedIn ? (
+                    <>
+                      <FaCheckCircle /> Sedang Nugas di Sini (Check-out)
+                    </>
+                  ) : (
+                    <>
+                      <FaDoorOpen /> Check-in di Spot Ini
+                    </>
+                  )}
+                </button>
+
+                <button
                   onClick={() => {
                     if (selectedPlace?.lat && selectedPlace?.lng) {
                       window.open(
@@ -865,6 +1024,11 @@ export default function Beranda() {
                   <FaLocationArrow /> Rute ke Sini
                 </button>
               </div>
+              {checkinMessage && (
+                <p className="mt-2 text-xs text-center sm:text-left font-medium text-[#8B6B4F] dark:text-[#C4A876]">
+                  {checkinMessage}
+                </p>
+              )}
             </div>
           </div>
         </div>

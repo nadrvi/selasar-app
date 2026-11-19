@@ -3,7 +3,11 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  reload,
+  signOut,
 } from "firebase/auth";
 import {
   auth,
@@ -12,7 +16,7 @@ import {
   githubProvider,
 } from "../data/firebase";
 import { useTheme } from "../context/ThemeContext";
-import { apiRegister, apiSocialLogin } from "../services/api";
+import { apiRegister, apiFirebaseSession } from "../services/api";
 
 import logoSelasar from "../assets/Logo.png";
 import Daun from "../assets/Daun.png";
@@ -28,9 +32,7 @@ import {
   AlertCircle,
   Sun,
   Moon,
-  Lock,
   Check,
-  Sparkles,
 } from "lucide-react";
 
 // INPUT SANITIZER
@@ -217,61 +219,118 @@ export default function Register() {
 
     setIsSubmitting(true);
 
+    let firebaseUser = auth.currentUser?.email?.toLowerCase() === cleanEmail
+      ? auth.currentUser
+      : null;
+    let firebaseAccountExists = Boolean(firebaseUser);
+
     try {
-      // 1. Simpan data akun LANGSUNG ke Database PostgreSQL (selasar-db)
-      const dbResponse = await apiRegister({
-        email: cleanEmail,
+      if (!firebaseUser) {
+        if (auth.currentUser) await signOut(auth);
+        try {
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            cleanEmail,
+            cleanPassword,
+          );
+          firebaseUser = userCredential.user;
+        } catch (createError) {
+          if (createError.code !== "auth/email-already-in-use") throw createError;
+
+          firebaseAccountExists = true;
+          const userCredential = await signInWithEmailAndPassword(
+            auth,
+            cleanEmail,
+            cleanPassword,
+          );
+          firebaseUser = userCredential.user;
+        }
+      }
+
+      await reload(firebaseUser);
+      await updateProfile(firebaseUser, { displayName: cleanUsername });
+      if (!firebaseUser.emailVerified) {
+        await sendEmailVerification(firebaseUser);
+      }
+
+      const idToken = await firebaseUser.getIdToken(true);
+      await apiRegister({
+        id_token: idToken,
         username: cleanUsername,
-        password: cleanPassword,
         birthday: formData.birthday || null,
         display_name: cleanUsername,
       });
 
-      console.log("Akun berhasil tersimpan di database PostgreSQL:", dbResponse);
-
-      // 2. Sinkronkan juga ke Firebase Auth (hybrid support)
-      let fbUid = null;
-      try {
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          cleanEmail,
-          cleanPassword,
-        );
-        fbUid = userCredential.user.uid;
-        await updateProfile(userCredential.user, {
-          displayName: cleanUsername,
+      if (firebaseUser.emailVerified) {
+        const session = await apiFirebaseSession({
+          id_token: await firebaseUser.getIdToken(true),
         });
-      } catch (fbErr) {
-        console.warn("Firebase Auth fallback/skip:", fbErr.message);
+        if (!session?.token || !session?.data?.id) {
+          throw new Error("Respons sesi server tidak lengkap.");
+        }
+
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("authToken", session.token);
+        localStorage.setItem(
+          "selasarUser",
+          JSON.stringify({
+            id: session.data.id,
+            name: firebaseUser.displayName || session.data.display_name || session.data.username,
+            username: session.data.username,
+            email: session.data.email,
+            uid: firebaseUser.uid,
+            role: session.data.role || "user",
+            photo: session.data.avatar_url || firebaseUser.photoURL || null,
+          }),
+        );
+
+        setIsExiting(true);
+        setTimeout(() => navigate("/beranda"), 400);
+        return;
       }
 
-      // 3. Simpan sesi user aktif
-      localStorage.setItem(
-        "selasarUser",
-        JSON.stringify({
-          id: dbResponse.data?.id,
-          name: cleanUsername,
-          email: cleanEmail,
-          uid: fbUid || dbResponse.data?.id,
-          birthdate: formData.birthday || "",
-        }),
-      );
+      await signOut(auth);
 
       setIsExiting(true);
-      setTimeout(() => navigate("/login"), 400);
+      setTimeout(() => navigate("/login", {
+        state: {
+          verificationMessage: "Akun berhasil disiapkan. Verifikasi email dari tautan yang kami kirim sebelum masuk.",
+        },
+      }), 400);
     } catch (error) {
       console.error("Register Error:", error);
       const errMsg = error.message || "";
-      if (errMsg.includes("sudah terdaftar") || error.code === "auth/email-already-in-use") {
-        setErrors({ email: "Email ini sudah terdaftar di database Selasar. Silakan langsung masuk." });
+      if (
+        firebaseAccountExists &&
+        ["auth/invalid-credential", "auth/wrong-password"].includes(error.code)
+      ) {
+        setErrors({
+          email: "Akun Firebase dengan email ini sudah ada, tetapi kata sandinya tidak cocok. Coba masuk atau reset password.",
+        });
+      } else if (errMsg.includes("Email ini sudah terdaftar")) {
+        setErrors({
+          email: firebaseUser?.emailVerified
+            ? "Email sudah terhubung ke profil Selasar. Coba masuk dengan akun tersebut."
+            : "Email ini sudah terhubung ke profil Selasar. Verifikasi email, lalu masuk untuk menghubungkan akun.",
+        });
       } else if (errMsg.includes("Username ini sudah digunakan")) {
-        setErrors({ username: "Username ini sudah dipakai orang lain. Pilih username lain." });
+        setErrors({
+          username: firebaseUser
+            ? "Username ini sudah dipakai. Akun Firebase sudah dibuat; pilih username lain lalu coba lagi."
+            : "Username ini sudah dipakai orang lain. Pilih username lain.",
+        });
       } else if (error.code === "auth/weak-password") {
         setErrors({
           password: "Password terlalu lemah untuk standar keamanan.",
         });
       } else {
-        setErrors({ general: `Gagal mendaftar ke database: ${errMsg}` });
+        setErrors({
+          general: firebaseUser
+            ? firebaseUser.emailVerified
+              ? "Profil sudah tersimpan, tetapi sesi belum dapat dibuat. Silakan masuk kembali."
+              : "Akun Firebase sudah dibuat. Jika email verifikasi sudah diterima, verifikasi lalu masuk untuk menyelesaikan pendaftaran."
+            : `Gagal mendaftar. ${errMsg}`,
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -290,17 +349,16 @@ export default function Register() {
 
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      const idToken = await user.getIdToken();
 
       // Simpan langsung ke database PostgreSQL (selasar-db)
-      const dbUser = await apiSocialLogin({
-        firebase_uid: user.uid,
-        email: user.email,
-        display_name: user.displayName || `${providerName} User`,
-        avatar_url: user.photoURL,
-      }).catch((err) => console.warn("Social DB sync warning:", err));
+      const dbUser = await apiFirebaseSession({ id_token: idToken });
+      if (!dbUser?.token || !dbUser?.data?.id) {
+        throw new Error("Respons login server tidak lengkap.");
+      }
 
       localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("authToken", user.accessToken);
+      localStorage.setItem("authToken", dbUser.token);
       localStorage.setItem(
         "selasarUser",
         JSON.stringify({
@@ -308,7 +366,7 @@ export default function Register() {
           name: user.displayName || `${providerName} User`,
           email: user.email,
           uid: user.uid,
-          photo: user.photoURL,
+          photo: dbUser.data.avatar_url || user.photoURL || null,
         }),
       );
 

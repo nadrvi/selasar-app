@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
   signInWithPopup,
   signInWithEmailAndPassword,
+  sendEmailVerification,
   sendPasswordResetEmail,
+  signOut,
 } from "firebase/auth";
 import {
   auth,
@@ -12,7 +14,7 @@ import {
   githubProvider,
 } from "../data/firebase";
 import { useTheme } from "../context/ThemeContext";
-import { apiLogin, apiSocialLogin } from "../services/api";
+import { apiFirebaseSession } from "../services/api";
 
 import logoSelasar from "../assets/Logo.png";
 import Daun from "../assets/Daun.png";
@@ -44,12 +46,14 @@ const sanitizeInput = (val) => {
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { darkMode, toggleDarkMode } = useTheme();
   const modalScrollRef = useRef(null);
 
   // Form State
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
+  const notice = location.state?.verificationMessage || "";
   const [showPassword, setShowPassword] = useState(false);
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
 
@@ -94,7 +98,6 @@ export default function Login() {
   const [isExiting, setIsExiting] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [qrScannedSuccess, setQrScannedSuccess] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
 
   useEffect(() => {
@@ -162,7 +165,6 @@ export default function Login() {
       setErrors({ general: "Terdeteksi aktivitas mencurigakan dari bot." });
       return;
     }
-
     // BOT DEFENSE 2: Timing submission check (< 1200ms)
     if (Date.now() - formMountTime.current < 1200) {
       setErrors({
@@ -198,47 +200,46 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      // 1. Verifikasi dan autentikasi LANGSUNG ke Database PostgreSQL (selasar-db)
-      const dbResponse = await apiLogin({
-        email: cleanEmail,
-        password: cleanPassword,
-      });
-
-      const dbUser = dbResponse.data;
-      console.log(
-        "Login sukses terverifikasi dari PostgreSQL selasar-db:",
-        dbUser,
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        cleanPassword,
       );
-
-      // 2. Hubungkan ke Firebase Auth (opsional/hybrid)
-      let fbToken = null;
-      try {
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          cleanEmail,
-          cleanPassword,
+      const firebaseUser = credential.user;
+      if (!firebaseUser.emailVerified) {
+        await sendEmailVerification(firebaseUser);
+        await signOut(auth);
+        const verificationError = new Error(
+          "Email belum diverifikasi. Kami mengirim ulang tautan verifikasi.",
         );
-        fbToken = userCredential.user.accessToken;
-      } catch (fbErr) {
-        console.warn("Firebase signin skip/hybrid:", fbErr.message);
+        verificationError.code = "auth/email-not-verified";
+        throw verificationError;
       }
 
-      // 3. Reset lockout counter on success
+      const idToken = await firebaseUser.getIdToken(true);
+      const dbResponse = await apiFirebaseSession({ id_token: idToken });
+
+      if (!dbResponse?.token || !dbResponse?.data?.id) {
+        throw new Error("Respons login server tidak lengkap.");
+      }
+      const dbUser = dbResponse.data;
+
+      // Reset lockout counter on success
       localStorage.removeItem(STORAGE_LOCKOUT_KEY);
       localStorage.removeItem(STORAGE_ATTEMPTS_KEY);
 
       localStorage.setItem("isLoggedIn", "true");
-      if (fbToken) localStorage.setItem("authToken", fbToken);
+      localStorage.setItem("authToken", dbResponse.token);
       localStorage.setItem(
         "selasarUser",
         JSON.stringify({
           id: dbUser.id,
-          name: dbUser.display_name || dbUser.username,
+          name: firebaseUser.displayName || dbUser.display_name || dbUser.username,
           username: dbUser.username,
           email: dbUser.email,
-          uid: dbUser.id,
+          uid: firebaseUser.uid,
           role: dbUser.role || "user",
-          photo: dbUser.avatar_url || null,
+          photo: dbUser.avatar_url || firebaseUser.photoURL || null,
         }),
       );
 
@@ -246,6 +247,23 @@ export default function Login() {
       setTimeout(() => navigate("/beranda"), 400);
     } catch (error) {
       console.error("Login Error:", error);
+      if (error.code === "auth/email-not-verified") {
+        setErrors({ general: error.message });
+        return;
+      }
+
+      const credentialErrors = new Set([
+        "auth/invalid-credential",
+        "auth/user-not-found",
+        "auth/wrong-password",
+      ]);
+      if (!credentialErrors.has(error.code)) {
+        setErrors({
+          general: error.message || "Gagal masuk. Silakan coba kembali.",
+        });
+        return;
+      }
+
       const nextAttempts = failedAttempts + 1;
       setFailedAttempts(nextAttempts);
       localStorage.setItem(STORAGE_ATTEMPTS_KEY, String(nextAttempts));
@@ -282,20 +300,9 @@ export default function Login() {
           password: `3x percobaan salah. Sistem dikunci 30 detik demi keamanan akun Anda.`,
         });
       } else {
-        const errMsg = error.message || "";
-        if (
-          errMsg.includes("tidak cocok") ||
-          errMsg.includes("belum terdaftar")
-        ) {
-          setErrors({
-            password: `Email atau password salah. (Sisa percobaan sebelum terkunci: ${3 - nextAttempts})`,
-          });
-        } else {
-          setErrors({
-            general:
-              errMsg || "Gagal masuk ke sistem database. Cek koneksi backend.",
-          });
-        }
+        setErrors({
+          password: `Email atau password salah. (Sisa percobaan sebelum terkunci: ${3 - nextAttempts})`,
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -315,28 +322,29 @@ export default function Login() {
 
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      const idToken = await user.getIdToken();
 
       localStorage.removeItem(STORAGE_LOCKOUT_KEY);
       localStorage.removeItem(STORAGE_ATTEMPTS_KEY);
 
       // Simpan akun sosial LANGSUNG ke Database PostgreSQL (selasar-db)
-      const dbUser = await apiSocialLogin({
-        firebase_uid: user.uid,
-        email: user.email,
-        display_name: user.displayName || `${providerName} User`,
-        avatar_url: user.photoURL,
-      }).catch((err) => console.warn("Social DB sync warning:", err));
+      const dbUser = await apiFirebaseSession({ id_token: idToken });
+      if (!dbUser?.token || !dbUser?.data?.id) {
+        throw new Error("Respons login server tidak lengkap.");
+      }
 
       localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("authToken", user.accessToken);
+      localStorage.setItem("authToken", dbUser.token);
       localStorage.setItem(
         "selasarUser",
         JSON.stringify({
           id: dbUser?.data?.id,
-          name: user.displayName || `${providerName} User`,
-          email: user.email,
+          name: user.displayName || dbUser.data.display_name || `${providerName} User`,
+          username: dbUser.data.username,
+          email: dbUser.data.email,
           uid: user.uid,
-          photo: user.photoURL,
+          role: dbUser.data.role || "user",
+          photo: dbUser.data.avatar_url || user.photoURL || null,
         }),
       );
 
@@ -363,23 +371,6 @@ export default function Login() {
     } finally {
       setLoadingProvider(null);
     }
-  };
-
-  const handleSimulateQrScan = () => {
-    setQrScannedSuccess(true);
-    setTimeout(() => {
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem(
-        "selasarUser",
-        JSON.stringify({
-          name: "Pengguna Selasar Mobile",
-          email: "mobile.user@selasar.app",
-          photo: null,
-        }),
-      );
-      setIsExiting(true);
-      setTimeout(() => navigate("/beranda"), 400);
-    }, 1200);
   };
 
   const handleOpenResetModal = (e) => {
@@ -409,14 +400,14 @@ export default function Login() {
       await sendPasswordResetEmail(auth, cleanMail);
       setResetStatus({
         type: "success",
-        msg: "Link reset password telah dikirim ke email Anda! Periksa folder Inbox atau Spam.",
+        msg: "Jika email terdaftar, link reset password akan dikirim. Periksa folder Inbox atau Spam.",
       });
     } catch (error) {
       console.error("Firebase Reset Password Error:", error);
       if (error.code === "auth/user-not-found") {
         setResetStatus({
-          type: "error",
-          msg: "Email ini belum terdaftar di Selasar.",
+          type: "success",
+          msg: "Jika email terdaftar, link reset password akan dikirim. Periksa folder Inbox atau Spam.",
         });
       } else if (error.code === "auth/invalid-email") {
         setResetStatus({
@@ -550,6 +541,12 @@ export default function Login() {
                       sebelum mencoba lagi.
                     </p>
                   </div>
+                </div>
+              )}
+
+              {notice && (
+                <div className="mb-5 p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
+                  {notice}
                 </div>
               )}
 
@@ -835,19 +832,12 @@ export default function Login() {
                 {/* MOBILE EXPANDED QR CODE */}
                 {showMobileQr && (
                   <div className="md:hidden p-4 rounded-2xl bg-[#FAF8F5] dark:bg-[#1F1B18] border border-gray-200 dark:border-[#3D342D] flex flex-col items-center text-center animate-fade-in">
-                    <div className="w-36 h-36 bg-white p-2.5 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center">
-                      <QrCodeGraphic size={120} />
+                    <div className="w-36 h-36 bg-white p-2.5 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center text-gray-400">
+                      <QrCode size={64} />
                     </div>
                     <p className="text-xs font-semibold text-[#594A42] dark:text-[#F5F2EB] mt-3">
-                      Scan via aplikasi kamera ponselmu
+                      Login QR belum tersedia. Gunakan email atau akun sosial.
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleSimulateQrScan}
-                      className="mt-2 text-[11px] font-bold text-[#8B6B4F] dark:text-[#C4A876] hover:underline"
-                    >
-                      Simulasi Scan Masuk
-                    </button>
                   </div>
                 )}
               </form>
@@ -875,54 +865,22 @@ export default function Login() {
           <div className="hidden md:flex md:w-[44%] border-l border-gray-100 dark:border-[#3D342D] bg-[#FAF8F5]/80 dark:bg-[#221D1A]/80 p-8 sm:p-10 flex-col items-center justify-center text-center relative overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-[#8B6B4F]/5 dark:bg-[#C4A876]/5 rounded-full blur-3xl pointer-events-none" />
 
-            {/* QR CODE CARD */}
-            <div
-              className="relative group cursor-pointer"
-              onClick={handleSimulateQrScan}
-              title="Klik untuk simulasi scan instan"
-            >
-              <div className="w-56 h-56 bg-white dark:bg-[#1A1614] rounded-3xl p-4 shadow-[0_15px_35px_-10px_rgba(89,74,66,0.18)] dark:shadow-[0_15px_35px_-10px_rgba(0,0,0,0.5)] border border-gray-200/80 dark:border-[#3D342D] flex flex-col items-center justify-center relative transition-transform duration-500 group-hover:scale-105">
-                <QrCodeGraphic size={190} />
-
-                {/* INSTANT SCAN SIMULATION BADGE OVERLAY */}
-                {qrScannedSuccess && (
-                  <div className="absolute inset-0 bg-[#594A42]/95 rounded-3xl flex flex-col items-center justify-center text-white p-4 animate-fade-in">
-                    <CheckCircle2
-                      size={40}
-                      className="text-emerald-400 mb-2 animate-bounce"
-                    />
-                    <p className="text-xs font-bold">QR Terverifikasi!</p>
-                    <p className="text-[10px] text-gray-200 mt-1">
-                      Mengalihkan ke beranda...
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* SIMULATE SCAN FLOATING PILL */}
-              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-[#2A2521] border border-gray-200 dark:border-[#3D342D] shadow-sm text-[11px] font-bold text-[#8B6B4F] dark:text-[#C4A876] transition-all group-hover:border-[#8B6B4F]">
-                <Sparkles size={12} />
-                <span>Klik QR untuk simulasi masuk</span>
-              </div>
+            <div className="w-56 h-56 bg-white dark:bg-[#1A1614] rounded-3xl p-4 shadow-[0_15px_35px_-10px_rgba(89,74,66,0.18)] dark:shadow-[0_15px_35px_-10px_rgba(0,0,0,0.5)] border border-gray-200/80 dark:border-[#3D342D] flex items-center justify-center text-gray-400">
+              <QrCode size={96} />
             </div>
 
             <div className="mt-6 max-w-[280px]">
               <h3 className="text-base font-extrabold text-[#594A42] dark:text-[#F5F2EB] leading-snug">
-                Atau,{" "}
-                <span className="text-[#8B6B4F] dark:text-[#C4A876]">
-                  masuk instan
-                </span>{" "}
-                dengan scan kode lewat ponselmu
+                Login QR belum tersedia
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium leading-relaxed">
-                Buka kamera ponsel kamu dan arahkan ke kode QR ini untuk login
-                cepat tanpa perlu mengetik kata sandi.
+                Silakan masuk menggunakan email atau penyedia akun sosial yang tersedia.
               </p>
             </div>
 
             <div className="mt-6 flex items-center gap-2 text-xs font-bold text-[#594A42]/70 dark:text-[#F5F2EB]/70">
               <Smartphone size={15} />
-              <span>Tersambung ke Selasar App</span>
+              <span>Autentikasi dilindungi Firebase</span>
             </div>
           </div>
         </div>
@@ -1014,7 +972,6 @@ export default function Login() {
     </div>
   );
 }
-
 // SLIDE-TO-VERIFY STRICT BOT DEFENSE COMPONENT
 export function SlideToVerify({ isVerified, onVerify, disabled }) {
   const [sliderPosition, setSliderPosition] = useState(0);
@@ -1121,153 +1078,5 @@ export function SlideToVerify({ isVerified, onVerify, disabled }) {
         </div>
       )}
     </div>
-  );
-}
-
-// HIGH FIDELITY SELASAR BRANDED QR CODE SVG
-function QrCodeGraphic({ size = 180 }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 200 200"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="text-gray-900 dark:text-white"
-    >
-      <rect x="15" y="15" width="46" height="46" rx="8" fill="currentColor" />
-      <rect
-        x="23"
-        y="23"
-        width="30"
-        height="30"
-        rx="4"
-        fill="white"
-        className="dark:fill-[#1A1614]"
-      />
-      <rect x="29" y="29" width="18" height="18" rx="3" fill="currentColor" />
-
-      <rect x="139" y="15" width="46" height="46" rx="8" fill="currentColor" />
-      <rect
-        x="147"
-        y="23"
-        width="30"
-        height="30"
-        rx="4"
-        fill="white"
-        className="dark:fill-[#1A1614]"
-      />
-      <rect x="153" y="29" width="18" height="18" rx="3" fill="currentColor" />
-
-      <rect x="15" y="139" width="46" height="46" rx="8" fill="currentColor" />
-      <rect
-        x="23"
-        y="147"
-        width="30"
-        height="30"
-        rx="4"
-        fill="white"
-        className="dark:fill-[#1A1614]"
-      />
-      <rect x="29" y="153" width="18" height="18" rx="3" fill="currentColor" />
-
-      <rect x="71" y="20" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="85" y="20" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="99" y="20" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="113" y="20" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="127" y="20" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="71" y="34" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="99" y="34" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="127" y="34" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="71" y="48" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="85" y="48" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="113" y="48" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="20" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="34" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="48" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="20" y="85" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="48" y="85" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="20" y="99" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="34" y="99" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="48" y="99" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="20" y="113" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="34" y="113" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="48" y="113" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="20" y="127" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="139" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="153" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="167" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="181" y="71" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="139" y="85" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="167" y="85" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="153" y="99" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="181" y="99" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="139" y="113" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="167" y="113" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="139" y="127" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="153" y="127" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="181" y="127" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="71" y="139" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="85" y="139" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="113" y="139" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="127" y="139" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="153" y="139" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="181" y="139" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="71" y="153" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="99" y="153" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="139" y="153" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="167" y="153" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="85" y="167" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="113" y="167" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="127" y="167" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="153" y="167" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect x="71" y="181" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="99" y="181" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="139" y="181" width="8" height="8" rx="2" fill="currentColor" />
-      <rect x="181" y="181" width="8" height="8" rx="2" fill="currentColor" />
-
-      <rect
-        x="68"
-        y="68"
-        width="64"
-        height="64"
-        rx="18"
-        fill="white"
-        className="dark:fill-[#1A1614]"
-        stroke="#594A42"
-        strokeWidth="2.5"
-      />
-
-      <g transform="translate(80, 80)">
-        <circle cx="20" cy="20" r="18" fill="#594A42" />
-        <path d="M12 16C12 21 16 25 21 25C26 25 30 21 30 16H12Z" fill="white" />
-        <path
-          d="M29 17H31C32.1 17 33 17.9 33 19C33 20.1 32.1 21 31 21H29V17Z"
-          stroke="white"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M17 11C17 9 19 9 19 7"
-          stroke="#C4A876"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M22 12C22 10 24 10 24 8"
-          stroke="#C4A876"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </g>
-    </svg>
   );
 }

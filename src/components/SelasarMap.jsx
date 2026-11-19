@@ -20,6 +20,13 @@ const CITY_COORDINATES = {
   "Show Everything": { center: [-6.55, 107.15], zoom: 9 },
 };
 
+const createTileLayer = (darkMode) =>
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    subdomains: "abc",
+    className: darkMode ? "selasar-dark-map-tiles" : undefined,
+  });
+
 const getCategoryEmoji = (category) => {
   switch (category) {
     case "Cafe":
@@ -146,15 +153,7 @@ export default function SelasarMap({
       touchZoom: true,
     });
 
-    // Custom Tile Layer
-    const tileUrl = darkMode
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-    const tileLayer = L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      subdomains: darkMode ? "abcd" : "abc",
-    }).addTo(map);
+    const tileLayer = createTileLayer(darkMode).addTo(map);
 
     tileLayerRef.current = tileLayer;
 
@@ -189,14 +188,7 @@ export default function SelasarMap({
       map.removeLayer(tileLayerRef.current);
     }
 
-    const tileUrl = darkMode
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-    tileLayerRef.current = L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      subdomains: darkMode ? "abcd" : "abc",
-    }).addTo(map);
+    tileLayerRef.current = createTileLayer(darkMode).addTo(map);
   }, [darkMode]);
 
   // 3. Update Markers when places or activeSpot changes

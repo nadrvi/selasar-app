@@ -14,6 +14,9 @@ import {
   FaBookmark,
   FaChevronDown,
   FaStar,
+  FaCheckCircle,
+  FaDoorOpen,
+  FaLocationArrow,
 } from "react-icons/fa";
 import TextSelasar from "../assets/text-logo.png";
 import {
@@ -21,7 +24,15 @@ import {
   toggleFavorite as toggleFavoriteStore,
   getFavorites as getStoredFavorites,
 } from "../utils/activityStore";
-import { fetchPlaces, toggleBookmarkAPI } from "../services/api";
+import {
+  fetchPlaces,
+  toggleBookmarkAPI,
+  checkinToPlace,
+  checkoutFromPlace,
+  fetchUserActiveCheckin,
+  logActivityAPI,
+} from "../services/api";
+
 
 const SORT_OPTIONS = [
   { value: "Match", label: "Paling Cocok" },
@@ -100,8 +111,34 @@ export default function Searching() {
   };
 
   const [selectedPlace, setSelectedPlace] = useState(null);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [isCheckinLoading, setIsCheckinLoading] = useState(false);
+  const [checkinMessage, setCheckinMessage] = useState("");
+
   useEffect(() => {
     document.body.style.overflow = selectedPlace ? "hidden" : "unset";
+  }, [selectedPlace]);
+
+  useEffect(() => {
+    if (!selectedPlace) {
+      setIsCheckedIn(false);
+      setCheckinMessage("");
+      return;
+    }
+    let userIdentifier = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      userIdentifier = stored?.id || stored?.uid || stored?.email;
+    } catch {
+      /* ignore */
+    }
+    if (userIdentifier) {
+      fetchUserActiveCheckin(userIdentifier)
+        .then((active) => {
+          setIsCheckedIn(active && Number(active.place_id) === Number(selectedPlace.id));
+        })
+        .catch(() => {});
+    }
   }, [selectedPlace]);
 
   const handleSelectPlace = (place) => {
@@ -113,8 +150,63 @@ export default function Searching() {
       subtitle: place.address,
       match: place.match,
     });
+
+    let userIdentifier = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      userIdentifier = stored?.id || stored?.uid || stored?.email;
+    } catch {
+      /* ignore */
+    }
+
+    if (userIdentifier) {
+      logActivityAPI({
+        uid: userIdentifier,
+        place_id: place.id,
+        event_type: "visit",
+        metadata: { source: "searching", place_name: place.name },
+      }).catch(() => {});
+    }
+
     setSelectedPlace(place);
   };
+
+  const handleCheckinToggle = async () => {
+    let userIdentifier = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      userIdentifier = stored?.id || stored?.uid || stored?.email;
+    } catch {
+      /* ignore */
+    }
+
+    if (!userIdentifier) {
+      setCheckinMessage("Silakan masuk/login terlebih dahulu untuk check-in.");
+      return;
+    }
+
+    if (!selectedPlace) return;
+
+    setIsCheckinLoading(true);
+    setCheckinMessage("");
+
+    try {
+      if (isCheckedIn) {
+        await checkoutFromPlace(userIdentifier, selectedPlace.id);
+        setIsCheckedIn(false);
+        setCheckinMessage("Check-out berhasil! Terima kasih sudah nugas di sini.");
+      } else {
+        await checkinToPlace(userIdentifier, selectedPlace.id);
+        setIsCheckedIn(true);
+        setCheckinMessage("Check-in berhasil! Selamat nugas di sini ☕");
+      }
+    } catch (err) {
+      setCheckinMessage(err.message || "Gagal memperbarui status check-in.");
+    } finally {
+      setIsCheckinLoading(false);
+    }
+  };
+
 
   const filteredPlaces = places.filter((place) => {
     const q = searchQuery.toLowerCase().trim();
@@ -355,75 +447,6 @@ export default function Searching() {
           isExiting ? "opacity-0 translate-y-6" : "opacity-100 translate-y-0"
         }`}
       >
-        {/* FILTER SECTION */}
-        <div className="bg-white dark:bg-[#2A2521] rounded-3xl p-6 sm:p-8 shadow-sm mb-10 w-full max-w-3xl border border-gray-100 dark:border-[#3D342D] transition-colors duration-500">
-          <h2 className="font-bold text-lg text-[#4A3B38] dark:text-[#F5F2EB] mb-5">
-            Pilih suasana yang kamu butuhkan
-          </h2>
-
-          {[
-            {
-              cat: "colokan",
-              icon: <FaPlug size={20} />,
-              title: "Ketersediaan Colokan",
-              desc: "Pilih fasilitas colokan yang tercatat",
-              options: filterOptions.colokan,
-            },
-            {
-              cat: "wifi",
-              icon: <FaWifi size={20} />,
-              title: "Kecepatan WiFi",
-              desc: "Pilih data WiFi yang tercatat",
-              options: filterOptions.wifi,
-            },
-            {
-              cat: "keramaian",
-              icon: <FaUsers size={20} />,
-              title: "Tingkat Keramaian",
-              desc: "Pilih suasana yang tercatat",
-              options: filterOptions.keramaian,
-            },
-          ].map((f) => (
-            <div
-              key={f.cat}
-              className="bg-[#EAE1DD] dark:bg-[#332C27] rounded-2xl p-4 sm:p-5 mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center transition-colors duration-500"
-            >
-              <div className="bg-[#6B554F] w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm">
-                {f.icon}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-[#4A3B38] dark:text-[#F5F2EB]">{f.title}</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 sm:mb-0">{f.desc}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleFilterClick(f.cat, "Semua")}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 active:scale-90 border ${
-                    activeFilters[f.cat] === "Semua"
-                      ? "bg-[#4A3B38] text-white border-[#4A3B38] shadow-md scale-105"
-                      : "bg-[#F3EFEA] dark:bg-[#3D342D] text-[#4A3B38] dark:text-[#F5F2EB] border-[#cbbdb0] dark:border-[#4a4038] hover:bg-[#e4dacd] dark:hover:bg-[#443a32]"
-                  }`}
-                >
-                  Semua
-                </button>
-                {f.options.map((btn) => (
-                  <button
-                    key={btn}
-                    onClick={() => handleFilterClick(f.cat, btn)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 active:scale-90 border ${
-                      activeFilters[f.cat] === btn
-                        ? "bg-[#4A3B38] text-white border-[#4A3B38] shadow-md scale-105"
-                        : "bg-[#F3EFEA] dark:bg-[#3D342D] text-[#4A3B38] dark:text-[#F5F2EB] border-[#cbbdb0] dark:border-[#4a4038] hover:bg-[#e4dacd] dark:hover:bg-[#443a32]"
-                    }`}
-                  >
-                    {btn}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* RECOMMENDATION SECTION */}
         <div className="w-full max-w-3xl">
           <div className="flex justify-between items-end mb-4 border-b border-gray-300/30 dark:border-[#3D342D] pb-3 gap-4">
@@ -698,9 +721,55 @@ export default function Searching() {
                 </div>
               </div>
 
-              <button className="w-full mt-6 py-4 bg-[#594A42] text-white rounded-xl font-bold hover:bg-[#433731] active:scale-95 transition-all shadow-md">
-                Lihat Rute ke Sini
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <button
+                  onClick={handleCheckinToggle}
+                  disabled={isCheckinLoading}
+                  className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm cursor-pointer transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 ${
+                    isCheckedIn
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "bg-[#8B6B4F] text-white hover:bg-[#735840]"
+                  }`}
+                >
+                  {isCheckinLoading ? (
+                    "Memproses..."
+                  ) : isCheckedIn ? (
+                    <>
+                      <FaCheckCircle /> Sedang Nugas (Check-out)
+                    </>
+                  ) : (
+                    <>
+                      <FaDoorOpen /> Check-in di Spot Ini
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (selectedPlace?.lat && selectedPlace?.lng) {
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}`,
+                        "_blank",
+                      );
+                    } else {
+                      window.open(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          selectedPlace.name + " " + (selectedPlace.city || ""),
+                        )}`,
+                        "_blank",
+                      );
+                    }
+                  }}
+                  className="flex-1 py-3 px-4 bg-[#594A42] text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-[#433731] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <FaLocationArrow /> Rute ke Sini
+                </button>
+              </div>
+              {checkinMessage && (
+                <p className="mt-2 text-xs text-center font-medium text-[#8B6B4F] dark:text-[#C4A876]">
+                  {checkinMessage}
+                </p>
+              )}
             </div>
           </div>
         </div>

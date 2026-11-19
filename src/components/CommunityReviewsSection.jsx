@@ -92,7 +92,7 @@ export default function CommunityReviewsSection({
       setLoading(true);
       setLoadError("");
       try {
-        const res = await fetchPlaceReviews(placeId, sort, uid);
+        const res = await fetchPlaceReviews(placeId, sort);
         if (alive) {
           setReviews(res.data || []);
           setSummary(res.summary || null);
@@ -120,7 +120,7 @@ export default function CommunityReviewsSection({
         : r
     ));
     try {
-      const res = await toggleReviewHelpfulAPI(reviewId, uid);
+      const res = await toggleReviewHelpfulAPI(reviewId);
       if (res?.success) {
         setReviews(prev => prev.map(r =>
           r.id === reviewId ? { ...r, is_helpful_by_me: res.isHelpful, helpful_count: res.helpful_count } : r

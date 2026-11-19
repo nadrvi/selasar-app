@@ -13,6 +13,7 @@ import {
   FaTimes,
   FaCheck,
   FaCamera,
+  FaAward,
 } from "react-icons/fa";
 import {
   getVisits,
@@ -20,10 +21,62 @@ import {
   getFavorites as getStoredFavorites,
   toggleFavorite as toggleFavoriteStore,
 } from "../utils/activityStore";
-import { toggleBookmarkAPI } from "../services/api";
+import {
+  toggleBookmarkAPI,
+  fetchUserProfile,
+  updateUserProfile,
+} from "../services/api";
 
 const FALLBACK_PLACE_IMG =
   "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80";
+
+const MAX_AVATAR_FILE_SIZE = 10 * 1024 * 1024;
+
+const createAvatarDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    const imageUrl = URL.createObjectURL(file);
+    const releaseImageUrl = () => URL.revokeObjectURL(imageUrl);
+
+    image.onload = () => {
+      releaseImageUrl();
+      if (!image.naturalWidth || !image.naturalHeight) {
+        reject(new Error("File foto tidak valid."));
+        return;
+      }
+
+      const maxDimension = 512;
+      const scale = Math.min(
+        1,
+        maxDimension / Math.max(image.naturalWidth, image.naturalHeight),
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Foto tidak dapat diproses di browser ini."));
+        return;
+      }
+
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      try {
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      } catch {
+        reject(new Error("Foto tidak dapat diproses."));
+      }
+    };
+
+    image.onerror = () => {
+      releaseImageUrl();
+      reject(new Error("File foto tidak dapat dibaca."));
+    };
+    image.src = imageUrl;
+  });
 
 const preferenceIcons = {
   colokan: <FaPlug size={18} />,
@@ -55,18 +108,22 @@ export default function Profile() {
     return () => clearInterval(interval);
   }, []);
 
-  // ===== USER DATA (sinkron dari Login/Register) =====
+  // ===== USER DATA (sinkron dari Login/Register & Database) =====
   const [user, setUser] = useState({ name: "Tamu", email: "", quote: "" });
   const [avatar, setAvatar] = useState(null);
-  // eslint-disable-next-line no-unused-vars
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [dbUser, setDbUser] = useState(null);
+  const [badges, setBadges] = useState([]);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("selasarUser"));
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsLoggedIn(loggedIn);
-
+    let storedUser = null;
+    try {
+      storedUser = JSON.parse(localStorage.getItem("selasarUser"));
+    } catch {
+      /* ignore */
+    }
     if (storedUser) {
       setUser({
         name: storedUser.name || "Tamu",
@@ -75,40 +132,125 @@ export default function Profile() {
           storedUser.quote ||
           "Nugas bukan sekadar tugas, tapi juga soal tempat.",
       });
+      setAvatar(storedUser.photo || null);
+
+      const userIdentifier = storedUser.id || storedUser.uid || storedUser.email;
+      if (userIdentifier) {
+        // Ambil data profil mutakhir & badges langsung dari PostgreSQL database (selasar-db)
+        fetchUserProfile(userIdentifier)
+          .then((profile) => {
+            if (profile) {
+              setDbUser(profile);
+              if (profile.display_name) {
+                setUser((prev) => ({
+                  ...prev,
+                  name: profile.display_name,
+                  quote: profile.bio || prev.quote,
+                }));
+              }
+              if (profile.avatar_url) {
+                setAvatar(profile.avatar_url);
+              }
+              if (Array.isArray(profile.badges)) {
+                setBadges(profile.badges);
+              }
+            }
+          })
+          .catch((err) => {
+            console.warn("[Profile] Gagal sinkron database profile:", err.message);
+          });
+      }
     }
 
     const storedAvatar = localStorage.getItem(
       `selasarAvatar_${storedUser?.email?.toLowerCase() || "guest"}`,
     );
-    if (storedAvatar) setAvatar(storedAvatar);
+    if (storedAvatar && !storedUser?.photo) setAvatar(storedAvatar);
   }, []);
 
-  const persistUser = (updated) => {
+  const persistUser = async (updated) => {
     const merged = { ...user, ...updated };
     setUser(merged);
-    const storedUser = JSON.parse(localStorage.getItem("selasarUser")) || {};
+    const storedUser = JSON.parse(localStorage.getItem("selasarUser") || "{}");
     localStorage.setItem(
       "selasarUser",
       JSON.stringify({ ...storedUser, ...merged }),
     );
+
+    // Sinkronkan langsung ke PostgreSQL database (selasar-db)
+    const userIdentifier = storedUser.id || storedUser.uid || storedUser.email;
+    if (userIdentifier) {
+      setIsSavingProfile(true);
+      try {
+        await updateUserProfile(userIdentifier, {
+          display_name: merged.name,
+          bio: merged.quote,
+        });
+      } catch (err) {
+        console.warn("[Profile] Gagal update profil ke database:", err.message);
+      } finally {
+        setIsSavingProfile(false);
+      }
+    }
   };
 
-  // ===== AVATAR UPLOAD (di-scope per akun juga) =====
+  // ===== AVATAR UPLOAD (sinkron ke DB dan local storage) =====
   const handleAvatarClick = () => fileInputRef.current?.click();
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
+  const handleAvatarChange = async (e) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result;
-      setAvatar(base64);
-      localStorage.setItem(
-        `selasarAvatar_${user.email?.toLowerCase() || "guest"}`,
-        base64,
-      );
-    };
-    reader.readAsDataURL(file);
+
+    setAvatarError("");
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Pilih file gambar untuk foto profil.");
+      input.value = "";
+      return;
+    }
+    if (file.size > MAX_AVATAR_FILE_SIZE) {
+      setAvatarError("Ukuran foto maksimal 10 MB.");
+      input.value = "";
+      return;
+    }
+
+    const previousAvatar = avatar;
+    setIsSavingAvatar(true);
+    try {
+      const avatarDataUrl = await createAvatarDataUrl(file);
+      const storedUser = JSON.parse(localStorage.getItem("selasarUser") || "{}");
+      const userIdentifier = storedUser.id || storedUser.uid || storedUser.email;
+      if (!userIdentifier) {
+        throw new Error("Akun tidak ditemukan. Silakan login ulang.");
+      }
+
+      const response = await updateUserProfile(userIdentifier, {
+        avatar_url: avatarDataUrl,
+      });
+      if (!response?.success || !response.data?.avatar_url) {
+        throw new Error(response?.message || "Foto profil gagal disimpan.");
+      }
+
+      setAvatar(response.data.avatar_url);
+      const email = (storedUser.email || user.email).toLowerCase();
+      if (email) {
+        try {
+          localStorage.setItem(
+            `selasarAvatar_${email}`,
+            response.data.avatar_url,
+          );
+        } catch (error) {
+          console.warn("[Profile] Avatar tersimpan di server, cache lokal gagal:", error.message);
+        }
+      }
+    } catch (error) {
+      console.error("[Profile] Gagal menyimpan avatar:", error);
+      setAvatar(previousAvatar);
+      setAvatarError(error.message || "Foto profil gagal disimpan. Coba lagi.");
+    } finally {
+      setIsSavingAvatar(false);
+      input.value = "";
+    }
   };
 
   // ===== EDIT NAMA & QUOTE =====
@@ -122,10 +264,11 @@ export default function Profile() {
     setEditOpen(true);
   };
 
-  const saveEdit = () => {
-    persistUser({ name: draftName.trim() || "Tamu", quote: draftQuote });
+  const saveEdit = async () => {
+    await persistUser({ name: draftName.trim() || "Tamu", quote: draftQuote });
     setEditOpen(false);
   };
+
 
   const [preferences, setPreferences] = useState(defaultPreferences);
   const [activePref, setActivePref] = useState(null);
@@ -245,7 +388,8 @@ export default function Profile() {
               <button
                 aria-label="Ubah foto profil"
                 onClick={handleAvatarClick}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md text-[#5E4B45] hover:scale-110 active:scale-95 transition-all"
+                disabled={isSavingAvatar}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md text-[#5E4B45] hover:scale-110 active:scale-95 transition-all disabled:cursor-wait disabled:opacity-60"
               >
                 <FaCamera size={11} />
               </button>
@@ -279,19 +423,32 @@ export default function Profile() {
               <p className="text-white/85 text-sm sm:text-base font-medium mt-2 leading-relaxed">
                 "{user.quote}"
               </p>
+              {isSavingAvatar && (
+                <p role="status" className="text-white/75 text-xs mt-2">
+                  Menyimpan foto profil...
+                </p>
+              )}
+              {avatarError && (
+                <p role="alert" className="text-red-100 text-xs mt-2">
+                  {avatarError}
+                </p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-[#3D342D] py-6">
             {[
               {
-                label: "Tempat Dikunjungi",
-                value: String(stats.visitedCount),
+                label: "Check-in / Kunjungan",
+                value: String(dbUser?.total_checkins ?? stats.visitedCount),
               },
-              { label: "Favorit", value: String(stats.favoriteCount) },
               {
-                label: "Mood Match Rata-rata",
-                value: stats.avgMatch !== null ? `${stats.avgMatch}%` : "-",
+                label: "Favorit Tersimpan",
+                value: String(dbUser?.total_bookmarks ?? stats.favoriteCount),
+              },
+              {
+                label: "Ulasan Komunitas",
+                value: String(dbUser?.total_reviews ?? 0),
               },
             ].map((stat) => (
               <div key={stat.label} className="text-center px-2">
@@ -305,6 +462,47 @@ export default function Profile() {
             ))}
           </div>
         </div>
+
+        {/* LENCANA & PRESTASI (DATABASE BADGES) */}
+        <div className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-sm border border-gray-100 dark:border-[#3D342D] p-6 sm:p-8 mb-8">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-bold text-lg text-[#4A3B38] dark:text-[#F5F2EB] flex items-center gap-2">
+              <FaAward className="text-[#8B6B4F] dark:text-[#C4A876]" />
+              Lencana Nugas Kamu
+            </h2>
+            <span className="text-xs font-semibold px-2.5 py-1 bg-[#8B6B4F]/10 text-[#8B6B4F] dark:text-[#C4A876] rounded-full">
+              {badges.length} Terkumpul
+            </span>
+          </div>
+
+          {badges.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {badges.map((b) => (
+                <div
+                  key={b.code}
+                  className="bg-[#F8F6F2] dark:bg-[#1F1B18] p-3 rounded-2xl flex items-center gap-3 border border-gray-100 dark:border-[#3D342D]"
+                >
+                  <span className="text-2xl">{b.emoji || "🎖️"}</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs sm:text-sm text-[#4A3B38] dark:text-[#F5F2EB] truncate">
+                      {b.name}
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                      {b.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-[#F8F6F2] dark:bg-[#1F1B18] rounded-2xl p-4 text-center">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                Belum ada lencana yang terbuka. Check-in di spot nugas favorit atau tulis ulasan komunitas untuk membuka lencana pertamamu! ☕
+              </p>
+            </div>
+          )}
+        </div>
+
 
         {/* PREFERENSI KAMU */}
         <div className="bg-white dark:bg-[#2A2521] rounded-3xl shadow-sm border border-gray-100 dark:border-[#3D342D] p-6 sm:p-8 mb-8">
@@ -471,9 +669,10 @@ export default function Profile() {
               </div>
               <button
                 onClick={saveEdit}
-                className="w-full bg-[#4A3B38] hover:bg-[#342927] active:scale-95 text-white py-3 rounded-full font-semibold transition-all mt-2"
+                disabled={isSavingProfile}
+                className="w-full bg-[#4A3B38] hover:bg-[#342927] disabled:opacity-60 active:scale-95 text-white py-3 rounded-full font-semibold transition-all mt-2 cursor-pointer"
               >
-                Simpan
+                {isSavingProfile ? "Menyimpan Bio Kamu..." : "Simpan"}
               </button>
             </div>
           </div>

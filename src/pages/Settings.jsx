@@ -4,6 +4,13 @@ import { useNavigate } from "react-router-dom";
 import logoSelasar from "../assets/Logo.png";
 import { useTheme } from "../context/ThemeContext";
 import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  signOut,
+  updatePassword,
+} from "firebase/auth";
+import { auth } from "../data/firebase";
+import {
   FaArrowLeft,
   FaUser,
   FaShieldAlt,
@@ -347,7 +354,7 @@ export default function Settings() {
     setTimeout(() => setShake(false), 400);
   };
 
-  const handlePwSubmit = (e) => {
+  const handlePwSubmit = async (e) => {
     e.preventDefault();
     if (!pwForm.current) return triggerPwError("Masukkan kata sandi saat ini");
     if (pwForm.next.length < 8)
@@ -355,10 +362,29 @@ export default function Settings() {
     if (pwForm.next !== pwForm.confirm)
       return triggerPwError("Konfirmasi kata sandi tidak cocok");
 
+    if (!localStorage.getItem("authToken") || !auth.currentUser) {
+      return triggerPwError("Silakan masuk terlebih dahulu untuk mengubah kata sandi");
+    }
+
     setPwError("");
     setPwSaving(true);
-    setTimeout(() => {
-      setPwSaving(false);
+
+    try {
+      const firebaseUser = auth.currentUser;
+      const hasPasswordProvider = firebaseUser.providerData.some(
+        (provider) => provider.providerId === "password",
+      );
+      if (!hasPasswordProvider || !firebaseUser.email) {
+        throw new Error("Akun ini masuk menggunakan penyedia sosial, bukan kata sandi.");
+      }
+
+      const credential = EmailAuthProvider.credential(
+        firebaseUser.email,
+        pwForm.current,
+      );
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await updatePassword(firebaseUser, pwForm.next);
+
       setPwSuccess(true);
       setTimeout(() => {
         setPwForm({ current: "", next: "", confirm: "" });
@@ -366,27 +392,43 @@ export default function Settings() {
         closeModal();
         showToast("Kata sandi berhasil diperbarui");
       }, 650);
-    }, 700);
+    } catch (err) {
+      if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        triggerPwError("Kata sandi saat ini tidak cocok.");
+      } else if (err.code === "auth/requires-recent-login") {
+        triggerPwError("Sesi sudah lama. Keluar lalu masuk kembali sebelum mengganti kata sandi.");
+      } else {
+        triggerPwError(err.message || "Gagal memperbarui kata sandi.");
+      }
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   const handleLogoutConfirm = () => {
     setLoggingOut(true);
     setTimeout(() => {
+      localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem("selasarUser");
+      localStorage.removeItem("authToken");
+      signOut(auth).catch((error) => {
+        console.error("Firebase logout failed:", error);
+      });
       setLoggingOut(false);
       setActiveModal(null);
       showToast("Berhasil keluar akun");
       handleNavigate("/");
-    }, 800);
+    }, 600);
   };
 
   const faqs = [
     {
       q: "Bagaimana cara mengubah kata sandi saya?",
-      a: "Buka Keamanan & Password, masukkan kata sandi lama dan kata sandi baru, lalu simpan perubahan.",
+      a: "Buka Keamanan & Password, masukkan kata sandi Firebase saat ini dan kata sandi baru, lalu simpan perubahan.",
     },
     {
       q: "Bagaimana cara menghubungi dukungan pelanggan?",
-      a: "Kirim email ke support@selasar.app atau chat kami setiap hari pukul 09.00–24.00 WIB.",
+      a: "Kirim email ke selasarsupport@gmail.com atau chat kami setiap hari pukul 09.00–24.00 WIB.",
     },
     {
       q: "Apakah data pribadi saya aman?",
@@ -822,7 +864,7 @@ export default function Settings() {
           >
             <FaEnvelope className={theme.textSecondary} size={14} />
             <span className={`text-sm ${theme.textPrimary}`}>
-              support@selasar.app
+              selasarsupport@gmail.com
             </span>
           </div>
         </div>
@@ -860,7 +902,7 @@ export default function Settings() {
             >
               <FaEnvelope className={theme.textSecondary} size={14} />
               <span className={`text-sm ${theme.textPrimary}`}>
-                support@selasar.app
+                selasarsupport@gmail.com
               </span>
             </div>
           </div>

@@ -4,6 +4,42 @@ import { resolveUser } from '../utils/userResolver.js';
 
 export const checkinsRouter = new Hono();
 
+// GET /api/checkins/user/:identifier - Get user's current active checkin
+checkinsRouter.get('/user/:identifier', async (c) => {
+  try {
+    const identifier = c.req.param('identifier');
+    const user = await resolveUser(identifier);
+
+    if (!user) {
+      return c.json({ success: true, active_checkin: null });
+    }
+
+    const sql = `
+      SELECT
+        ch.id,
+        ch.place_id,
+        ch.note,
+        ch.checked_in_at,
+        p.name AS place_name,
+        p.slug AS place_slug
+      FROM checkins ch
+      JOIN places p ON p.id = ch.place_id
+      WHERE ch.user_id = $1 AND ch.status = 'active'
+      ORDER BY ch.checked_in_at DESC
+      LIMIT 1
+    `;
+
+    const result = await query(sql, [user.id]);
+
+    return c.json({
+      success: true,
+      active_checkin: result.rows[0] || null,
+    });
+  } catch (err) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
 // GET /api/checkins/place/:placeId - Get active visitors in a place
 checkinsRouter.get('/place/:placeId', async (c) => {
   try {
@@ -38,15 +74,12 @@ checkinsRouter.get('/place/:placeId', async (c) => {
 // POST /api/checkins/in - User check-in
 checkinsRouter.post('/in', async (c) => {
   try {
-    const { uid, firebase_uid, user_id, place_id, note } = await c.req.json();
-    const identifier = uid || firebase_uid || user_id;
+    const { place_id, note } = await c.req.json();
+    const user = c.get('authUser');
 
-    if (!identifier || !place_id) {
-      return c.json({ success: false, message: 'Identitas user (uid) dan place_id wajib disertakan' }, 400);
+    if (!user || !Number.isInteger(Number(place_id)) || Number(place_id) < 1) {
+      return c.json({ success: false, message: 'place_id valid wajib disertakan.' }, 400);
     }
-
-    const user = await resolveUser(identifier);
-    if (!user) return c.json({ success: false, message: 'User tidak ditemukan atau belum login' }, 404);
     const userId = user.id;
 
     const placeRes = await query('SELECT id, name FROM places WHERE id = $1', [place_id]);
@@ -92,15 +125,12 @@ checkinsRouter.post('/in', async (c) => {
 // POST /api/checkins/out - User check-out
 checkinsRouter.post('/out', async (c) => {
   try {
-    const { uid, firebase_uid, user_id, place_id } = await c.req.json();
-    const identifier = uid || firebase_uid || user_id;
+    const { place_id } = await c.req.json();
+    const user = c.get('authUser');
 
-    if (!identifier || !place_id) {
-      return c.json({ success: false, message: 'Identitas user (uid) dan place_id wajib disertakan' }, 400);
+    if (!user || !Number.isInteger(Number(place_id)) || Number(place_id) < 1) {
+      return c.json({ success: false, message: 'place_id valid wajib disertakan.' }, 400);
     }
-
-    const user = await resolveUser(identifier);
-    if (!user) return c.json({ success: false, message: 'User tidak ditemukan' }, 404);
     const userId = user.id;
 
     const result = await query(`
