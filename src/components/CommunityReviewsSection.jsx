@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FaStar,
   FaWifi,
@@ -75,10 +75,16 @@ export default function CommunityReviewsSection({
   refreshTrigger = 0,
 }) {
   const [reviews, setReviews]                   = useState([]);
+  const [reviewTotal, setReviewTotal]           = useState(0);
   const [summary, setSummary]                   = useState(null);
   const [communityInsights, setCommunityInsights] = useState(null);
   const [loading, setLoading]                   = useState(true);
+  const [loadingMore, setLoadingMore]           = useState(false);
+  const [hasMore, setHasMore]                   = useState(false);
   const [loadError, setLoadError]               = useState("");
+  const [loadMoreError, setLoadMoreError]       = useState("");
+  const [helpfulError, setHelpfulError]         = useState("");
+  const activeListKey = useRef("");
   const [sort, setSort]                         = useState("latest");
   const [filterPurpose, setFilterPurpose]       = useState("all");
 
@@ -87,14 +93,20 @@ export default function CommunityReviewsSection({
   /* fetch */
   useEffect(() => {
     let alive = true;
+    activeListKey.current = `${placeId}:${sort}:${refreshTrigger}:${uid || ""}`;
     (async () => {
       if (!placeId) return;
       setLoading(true);
       setLoadError("");
+      setLoadMoreError("");
+      setHasMore(false);
+      setReviewTotal(0);
       try {
-        const res = await fetchPlaceReviews(placeId, sort);
+        const res = await fetchPlaceReviews(placeId, sort, 50, 0);
         if (alive) {
           setReviews(res.data || []);
+          setReviewTotal(res.total || 0);
+          setHasMore(Boolean(res.has_more));
           setSummary(res.summary || null);
           setCommunityInsights(res.community_insights || null);
         }
@@ -108,9 +120,32 @@ export default function CommunityReviewsSection({
     return () => { alive = false; };
   }, [placeId, sort, refreshTrigger, uid]);
 
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    const listKey = activeListKey.current;
+    setLoadingMore(true);
+    setLoadMoreError("");
+    try {
+      const res = await fetchPlaceReviews(placeId, sort, 50, reviews.length);
+      if (activeListKey.current === listKey) {
+        setReviews((previous) => [...previous, ...(res.data || [])]);
+        setHasMore(Boolean(res.has_more));
+      }
+    } catch (err) {
+      if (activeListKey.current === listKey) {
+        setLoadMoreError(err.message || "Gagal memuat ulasan berikutnya.");
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   /* helpful toggle */
   const handleToggleHelpful = async (reviewId) => {
     if (!currentUser) { alert("Silakan login terlebih dahulu."); return; }
+    const originalReview = reviews.find((review) => review.id === reviewId);
+    if (!originalReview) return;
+    setHelpfulError("");
     setReviews(prev => prev.map(r =>
       r.id === reviewId
         ? { ...r, is_helpful_by_me: !r.is_helpful_by_me,
@@ -125,8 +160,15 @@ export default function CommunityReviewsSection({
         setReviews(prev => prev.map(r =>
           r.id === reviewId ? { ...r, is_helpful_by_me: res.isHelpful, helpful_count: res.helpful_count } : r
         ));
+      } else {
+        throw new Error(res?.message || "Gagal memperbarui vote.");
       }
-    } catch {}
+    } catch (err) {
+      setReviews((prev) => prev.map((review) =>
+        review.id === reviewId ? originalReview : review
+      ));
+      setHelpfulError(err.message || "Gagal memperbarui vote.");
+    }
   };
 
   const filtered = reviews.filter(r => filterPurpose === "all" || r.visit_purpose === filterPurpose);
@@ -165,7 +207,7 @@ export default function CommunityReviewsSection({
             <h3 className="text-base font-extrabold tracking-tight">Ulasan Komunitas</h3>
             {reviews.length > 0 && (
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#8B6B4F]/10 text-[#8B6B4F] dark:bg-[#C4A876]/20 dark:text-[#C4A876]">
-                {reviews.length} ulasan
+                {reviewTotal} ulasan
               </span>
             )}
           </div>
@@ -196,7 +238,7 @@ export default function CommunityReviewsSection({
               <div className="pb-0.5 space-y-0.5">
                 <FaStar className="text-amber-400" size={16} />
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-none whitespace-nowrap">
-                  {reviews.length} ulasan
+                  {reviewTotal} ulasan
                 </p>
               </div>
             </div>
@@ -316,6 +358,11 @@ export default function CommunityReviewsSection({
       </div>
 
       {/* ── Review list ── */}
+      {helpfulError && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {helpfulError}
+        </p>
+      )}
       {loading ? (
         <div className="py-10 flex flex-col items-center gap-2 text-gray-400">
           <div className="w-5 h-5 border-2 border-[#8B6B4F] border-t-transparent rounded-full animate-spin" />
@@ -348,6 +395,23 @@ export default function CommunityReviewsSection({
           >
             <FaPen size={10} /> Bagikan Pengalaman
           </button>
+          {hasMore && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-5 py-2 rounded-xl border border-gray-200 dark:border-[#3D342D] bg-white dark:bg-[#2A2521] text-xs font-bold text-[#8B6B4F] dark:text-[#C4A876] disabled:opacity-60"
+              >
+                {loadingMore ? "Memuat..." : "Muat lebih banyak ulasan"}
+              </button>
+              {loadMoreError && (
+                <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                  {loadMoreError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -428,6 +492,23 @@ export default function CommunityReviewsSection({
                         </span>
                       );
                     })}
+                    {hasMore && (
+                      <div className="space-y-2 pt-1 text-center">
+                        <button
+                          type="button"
+                          onClick={handleLoadMore}
+                          disabled={loadingMore}
+                          className="px-5 py-2 rounded-xl border border-gray-200 dark:border-[#3D342D] bg-white dark:bg-[#2A2521] text-xs font-bold text-[#8B6B4F] dark:text-[#C4A876] hover:bg-gray-50 dark:hover:bg-[#211D1A] disabled:opacity-60"
+                        >
+                          {loadingMore ? "Memuat..." : "Muat lebih banyak ulasan"}
+                        </button>
+                        {loadMoreError && (
+                          <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                            {loadMoreError}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

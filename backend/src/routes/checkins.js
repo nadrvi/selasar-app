@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { query } from '../config/db.js';
+import { query, withTransaction } from '../config/db.js';
 import { resolveUser } from '../utils/userResolver.js';
 
 export const checkinsRouter = new Hono();
@@ -48,7 +48,6 @@ checkinsRouter.get('/place/:placeId', async (c) => {
     const sql = `
       SELECT 
         ch.id,
-        ch.note,
         ch.checked_in_at,
         u.username,
         u.display_name,
@@ -74,47 +73,70 @@ checkinsRouter.get('/place/:placeId', async (c) => {
 // POST /api/checkins/in - User check-in
 checkinsRouter.post('/in', async (c) => {
   try {
-    const { place_id, note } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+    }
+    const { place_id, note } = body || {};
     const user = c.get('authUser');
+    const placeId = Number(place_id);
 
-    if (!user || !Number.isInteger(Number(place_id)) || Number(place_id) < 1) {
+    if (!user || !Number.isSafeInteger(placeId) || placeId < 1) {
       return c.json({ success: false, message: 'place_id valid wajib disertakan.' }, 400);
     }
-    const userId = user.id;
+    if (note != null && (typeof note !== 'string' || note.length > 500)) {
+      return c.json({ success: false, message: 'Catatan check-in tidak valid.' }, 400);
+    }
 
-    const placeRes = await query('SELECT id, name FROM places WHERE id = $1', [place_id]);
-    if (placeRes.rows.length === 0) return c.json({ success: false, message: 'Spot nugas tidak ditemukan' }, 404);
+    const outcome = await withTransaction(async (tx) => {
+      await tx('SELECT id FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+      const placeRes = await tx('SELECT id, name FROM places WHERE id = $1', [placeId]);
+      if (placeRes.rows.length === 0) return { notFound: true };
 
-    // Auto checkout previous active checkin anywhere
-    await query(`
-      UPDATE checkins 
-      SET status = 'ended', checked_out_at = NOW(),
-          duration_min = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (NOW() - checked_in_at)) / 60))
-      WHERE user_id = $1 AND status = 'active'
-    `, [userId]);
+      await tx(`
+        UPDATE checkins
+        SET status = 'ended', checked_out_at = NOW(),
+            duration_min = GREATEST(
+              1,
+              ROUND(EXTRACT(EPOCH FROM (NOW() - checked_in_at)) / 60)::integer
+            )
+        WHERE user_id = $1 AND status = 'active'
+      `, [user.id]);
 
-    const insertSql = `
-      INSERT INTO checkins (user_id, place_id, note, status)
-      VALUES ($1, $2, $3, 'active')
-      RETURNING *
-    `;
+      const result = await tx(`
+        INSERT INTO checkins (user_id, place_id, note, status)
+        VALUES ($1, $2, $3, 'active')
+        RETURNING *
+      `, [user.id, placeId, typeof note === 'string' ? note.trim() || null : null]);
 
-    const result = await query(insertSql, [userId, place_id, note || null]);
+      await tx(`
+        INSERT INTO user_badges (user_id, badge_id)
+        SELECT $1, id FROM badges WHERE code = 'checkin_first'
+        ON CONFLICT (user_id, badge_id) DO NOTHING
+      `, [user.id]);
 
-    // Auto-award badge 'checkin_first' jika belum punya
-    query(`
-      INSERT INTO user_badges (user_id, badge_id)
-      SELECT $1, id FROM badges WHERE code = 'checkin_first'
-      ON CONFLICT (user_id, badge_id) DO NOTHING
-    `, [userId]).catch(() => {});
+      const visitorsRes = await tx(
+        'SELECT current_visitors FROM places WHERE id = $1',
+        [placeId],
+      );
+      return {
+        placeName: placeRes.rows[0].name,
+        data: result.rows[0],
+        currentVisitors: visitorsRes.rows[0]?.current_visitors || 0,
+      };
+    });
 
-    const visitorsRes = await query('SELECT current_visitors FROM places WHERE id = $1', [place_id]);
+    if (outcome.notFound) {
+      return c.json({ success: false, message: 'Spot nugas tidak ditemukan.' }, 404);
+    }
 
     return c.json({
       success: true,
-      message: `Check-in berhasil di ${placeRes.rows[0].name}! Selamat nugas.`,
-      data: result.rows[0],
-      current_visitors: visitorsRes.rows[0]?.current_visitors || 0,
+      message: `Check-in berhasil di ${outcome.placeName}! Selamat nugas.`,
+      data: outcome.data,
+      current_visitors: outcome.currentVisitors,
     }, 201);
   } catch (err) {
     console.error('Error during check-in:', err);
@@ -125,29 +147,47 @@ checkinsRouter.post('/in', async (c) => {
 // POST /api/checkins/out - User check-out
 checkinsRouter.post('/out', async (c) => {
   try {
-    const { place_id } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+    }
+    const { place_id } = body || {};
     const user = c.get('authUser');
+    const placeId = Number(place_id);
 
-    if (!user || !Number.isInteger(Number(place_id)) || Number(place_id) < 1) {
+    if (!user || !Number.isSafeInteger(placeId) || placeId < 1) {
       return c.json({ success: false, message: 'place_id valid wajib disertakan.' }, 400);
     }
-    const userId = user.id;
 
-    const result = await query(`
-      UPDATE checkins 
-      SET status = 'ended', checked_out_at = NOW(),
-          duration_min = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (NOW() - checked_in_at)) / 60))
-      WHERE user_id = $1 AND place_id = $2 AND status = 'active'
-      RETURNING *
-    `, [userId, place_id]);
-
-    const visitorsRes = await query('SELECT current_visitors FROM places WHERE id = $1', [place_id]);
+    const outcome = await withTransaction(async (tx) => {
+      await tx('SELECT id FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+      const result = await tx(`
+        UPDATE checkins
+        SET status = 'ended', checked_out_at = NOW(),
+            duration_min = GREATEST(
+              1,
+              ROUND(EXTRACT(EPOCH FROM (NOW() - checked_in_at)) / 60)::integer
+            )
+        WHERE user_id = $1 AND place_id = $2 AND status = 'active'
+        RETURNING *
+      `, [user.id, placeId]);
+      const visitorsRes = await tx(
+        'SELECT current_visitors FROM places WHERE id = $1',
+        [placeId],
+      );
+      return {
+        data: result.rows[0] || null,
+        currentVisitors: visitorsRes.rows[0]?.current_visitors || 0,
+      };
+    });
 
     return c.json({
       success: true,
       message: 'Check-out berhasil. Terima kasih sudah nugas di sini!',
-      data: result.rows[0] || null,
-      current_visitors: visitorsRes.rows[0]?.current_visitors || 0,
+      data: outcome.data,
+      current_visitors: outcome.currentVisitors,
     });
   } catch (err) {
     return c.json({ success: false, message: err.message }, 500);

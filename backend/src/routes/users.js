@@ -64,32 +64,77 @@ usersRouter.get('/:identifier/profile', async (c) => {
 // PUT /api/users/:identifier/profile - Update user profile (name, bio, birthday, avatar)
 usersRouter.put('/:identifier/profile', async (c) => {
   try {
+    const authUser = c.get('authUser');
+    if (!authUser) {
+      return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+    }
+
     const identifier = c.req.param('identifier');
     const user = await resolveUser(identifier);
 
     if (!user) {
       return c.json({ success: false, message: 'User tidak ditemukan' }, 404);
     }
+    if (user.id !== authUser.id) {
+      return c.json({ success: false, message: 'Akses ditolak.' }, 403);
+    }
 
-    const { display_name, bio, birthday, avatar_url } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+    }
+
+    const { display_name, bio, birthday, avatar_url } = body;
+    const hasField = (field) => Object.prototype.hasOwnProperty.call(body, field);
+    const isNullableText = (value, maxLength) =>
+      value === null || (typeof value === 'string' && value.length <= maxLength);
+    const isValidBirthday = (value) => {
+      if (value === null || value === '') return true;
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+    };
+    const isValidAvatar = (value) => {
+      if (value === null || value === '') return true;
+      if (typeof value !== 'string' || value.length > 2048) return false;
+      try {
+        return new URL(value).protocol === 'https:';
+      } catch {
+        return false;
+      }
+    };
+
+    if (
+      (hasField('display_name') && !isNullableText(display_name, 100)) ||
+      (hasField('bio') && !isNullableText(bio, 500)) ||
+      (hasField('birthday') && !isValidBirthday(birthday)) ||
+      (hasField('avatar_url') && !isValidAvatar(avatar_url))
+    ) {
+      return c.json({ success: false, message: 'Data profil tidak valid.' }, 400);
+    }
 
     const fields = [];
     const values = [];
 
-    if (display_name !== undefined) {
-      values.push(display_name);
+    if (hasField('display_name')) {
+      values.push(typeof display_name === 'string' ? display_name.trim() : null);
       fields.push(`display_name = $${values.length}`);
     }
-    if (bio !== undefined) {
-      values.push(bio);
+    if (hasField('bio')) {
+      values.push(typeof bio === 'string' ? bio.trim() : null);
       fields.push(`bio = $${values.length}`);
     }
-    if (birthday !== undefined) {
-      values.push(birthday);
+    if (hasField('birthday')) {
+      values.push(birthday || null);
       fields.push(`birthday = $${values.length}`);
     }
-    if (avatar_url !== undefined) {
-      values.push(avatar_url);
+    if (hasField('avatar_url')) {
+      values.push(avatar_url || null);
       fields.push(`avatar_url = $${values.length}`);
     }
 

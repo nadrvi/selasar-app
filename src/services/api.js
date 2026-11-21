@@ -4,7 +4,7 @@
  */
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:4000';
+  import.meta.env.DEV ? import.meta.env.VITE_API_URL || '' : '';
 
 /**
  * Helper fetch wrapper dengan timeout & JSON parsing
@@ -41,6 +41,17 @@ async function fetchAPI(endpoint, options = {}) {
 
   if (!res.ok) {
     const errBody = await res.json().catch(() => null);
+    if (
+      res.status === 401 ||
+      (
+        res.status === 403 &&
+        ['/api/auth/session', '/api/auth/register/social'].includes(endpoint)
+      )
+    ) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('selasarUser');
+    }
     throw new Error(`HTTP_${res.status}: ${errBody?.message || res.statusText}`);
   }
 
@@ -129,6 +140,16 @@ export async function apiRegister({ id_token, username, birthday, display_name }
  */
 export async function apiFirebaseSession({ id_token }) {
   return await fetchAPI('/api/auth/session', {
+    method: 'POST',
+    body: JSON.stringify({ id_token }),
+  });
+}
+
+/**
+ * Daftarkan akun sosial baru atau buat sesi untuk akun sosial yang sudah ada.
+ */
+export async function apiFirebaseSocialRegister({ id_token }) {
+  return await fetchAPI('/api/auth/register/social', {
     method: 'POST',
     body: JSON.stringify({ id_token }),
   });
@@ -233,8 +254,8 @@ export async function checkBookmarkAPI(uid, placeId) {
 //  REVIEWS API (COMMUNITY REVIEWS)
 // ============================================================
 
-export async function fetchPlaceReviews(placeId, sort = 'latest') {
-  const queryParam = `?sort=${sort}`;
+export async function fetchPlaceReviews(placeId, sort = 'latest', limit = 50, offset = 0) {
+  const queryParam = `?sort=${encodeURIComponent(sort)}&limit=${limit}&offset=${offset}`;
   const res = await fetchAPI(`/api/reviews/place/${placeId}${queryParam}`);
   if (!res.success) {
     throw new Error(`API_ERROR: ${res.message || 'Gagal memuat ulasan'}`);
@@ -261,6 +282,17 @@ export async function toggleReviewHelpfulAPI(reviewId) {
     method: 'POST',
     body: JSON.stringify({}),
   });
+}
+
+export async function logoutAuthSession() {
+  const res = await fetchAPI('/api/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  if (!res.success) {
+    throw new Error(res.message || 'Gagal mengakhiri sesi di server.');
+  }
+  return res;
 }
 
 // ============================================================

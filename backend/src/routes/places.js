@@ -58,6 +58,22 @@ export const formatPlaceForClient = (p) => {
 placesRouter.get('/', async (c) => {
   try {
     const { city, category, mood, q, sort, limit = 50, offset = 0 } = c.req.query();
+    const pageSize = Number(limit);
+    const pageOffset = Number(offset);
+
+    if (
+      !Number.isSafeInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > 100 ||
+      !Number.isSafeInteger(pageOffset) ||
+      pageOffset < 0 ||
+      pageOffset > 10000
+    ) {
+      return c.json({ success: false, message: 'Parameter pagination tidak valid.' }, 400);
+    }
+    if (q && q.length > 120) {
+      return c.json({ success: false, message: 'Kata pencarian terlalu panjang.' }, 400);
+    }
 
     let sql = `
       SELECT 
@@ -99,8 +115,8 @@ placesRouter.get('/', async (c) => {
       sql += ` AND p.mood = $${params.length}::mood_type`;
     }
 
-    if (q) {
-      params.push(`%${q}%`);
+    if (q?.trim()) {
+      params.push(`%${q.trim()}%`);
       sql += ` AND (p.name ILIKE $${params.length} OR p.description ILIKE $${params.length} OR p.address ILIKE $${params.length})`;
     }
 
@@ -117,10 +133,10 @@ placesRouter.get('/', async (c) => {
       sql += ` ORDER BY p.id ASC`;
     }
 
-    params.push(parseInt(limit, 10));
+    params.push(pageSize);
     sql += ` LIMIT $${params.length}`;
 
-    params.push(parseInt(offset, 10));
+    params.push(pageOffset);
     sql += ` OFFSET $${params.length}`;
 
     const result = await query(sql, params);

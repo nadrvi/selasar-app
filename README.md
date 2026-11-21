@@ -149,7 +149,7 @@ The application uses `localStorage` for client-side caching and state persistenc
 
 ### Prerequisites
 
-- Node.js: v18.0.0 or higher
+- Node.js: v22.12.0 or higher
 - npm: v9.0.0 or higher
 
 ### Installation
@@ -191,6 +191,75 @@ The application uses `localStorage` for client-side caching and state persistenc
    ```bash
    npm run build
    ```
+
+### Deploy to Cloudflare
+
+The Cloudflare deployment serves the Vite frontend and Hono API from one Worker
+origin. PostgreSQL connections use Cloudflare Hyperdrive; file uploads continue
+to use the configured Neon S3-compatible bucket.
+
+1. Install the root workspace dependencies and authenticate:
+
+   ```bash
+   npm install
+   npx wrangler login
+   ```
+
+2. Create a Hyperdrive configuration using the direct (non-pooled) PostgreSQL
+   connection string for the Selasar database. Keep it private and do not commit it:
+
+   ```bash
+   npx wrangler hyperdrive create selasar-production --connection-string "<DATABASE_URL>"
+   ```
+
+   Copy the returned ID into `hyperdrive[0].id` in `wrangler.jsonc`.
+
+3. Before routing production traffic, apply `backend/selasar_database.sql` if
+   the database schema has not been installed, then run the backend's required
+   account/password cleanup migrations using its production database
+   configuration:
+
+   ```bash
+   npm run migrate:secure-seed-accounts --workspace selasar-backend
+   npm run migrate:clear-legacy-password-hashes --workspace selasar-backend
+   ```
+
+4. Add the required secrets (Wrangler prompts for each value):
+
+   ```bash
+   npx wrangler secret put AUTH_TOKEN_SECRET
+   npx wrangler secret put AWS_ACCESS_KEY_ID
+   npx wrangler secret put AWS_SECRET_ACCESS_KEY
+   ```
+
+   `AUTH_TOKEN_SECRET` must be a persistent random value of at least 32 bytes.
+   Generate one locally with
+   `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`
+   and paste it at Wrangler's prompt; never put it in this repository.
+   The Firebase project, Neon S3 endpoint, region, and bucket are non-secret
+   deployment settings in `wrangler.jsonc`. If another site origin needs to call
+   the API, add a `CLIENT_URL` variable there with a comma-separated list of
+   allowed origins; the bundled frontend and API already share an origin.
+
+5. Build and deploy:
+
+   ```bash
+   npm run deploy
+   ```
+
+   The deployed API health endpoints are `/api/health` and `/health/db`. For
+   local Vite development, start the backend with `npm run dev:backend`; Vite
+   proxies `/api` requests to it. Do not deploy until the Hyperdrive ID and all
+   three secrets are configured.
+
+   To run the Worker locally, `npm run dev:cloudflare` uses the placeholder
+   `localConnectionString` in `wrangler.jsonc`. Replace it with a reachable
+   development database URL (the current database client requires TLS) before
+   testing database-backed API routes. Never use a production database for
+   local write testing.
+
+6. In Firebase Authentication settings, add the deployed `workers.dev` or
+   custom domain to **Authorized domains** so sign-in redirects work.
 
 ---
 

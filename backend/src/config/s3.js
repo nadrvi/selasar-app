@@ -1,20 +1,27 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import dotenv from 'dotenv';
+import process from 'node:process';
 
 dotenv.config();
 
 const accessKeyId = process.env.AWS_ACCESS_KEY_ID || '';
 const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || '';
+const endpoint = process.env.AWS_ENDPOINT_URL_S3 || '';
+export const BUCKET_NAME = process.env.S3_BUCKET_NAME || '';
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const isPlaceholderCredential = (value) =>
+  !value || /^(?:\*+|YOUR_|CHANGE_ME|REPLACE_ME)/i.test(value);
 
 export const isS3Configured = Boolean(
-  accessKeyId &&
-  secretAccessKey &&
-  !secretAccessKey.includes('*')
+  !isPlaceholderCredential(accessKeyId) &&
+  !isPlaceholderCredential(secretAccessKey) &&
+  endpoint &&
+  BUCKET_NAME
 );
 
 export const s3Client = new S3Client({
-  endpoint: process.env.AWS_ENDPOINT_URL_S3,
+  endpoint: endpoint || undefined,
   region: process.env.AWS_REGION || 'ap-southeast-1',
   credentials: {
     accessKeyId,
@@ -23,10 +30,8 @@ export const s3Client = new S3Client({
   forcePathStyle: true,
 });
 
-export const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'selasar-assets';
-
 /**
- * Generate a pre-signed URL for direct client-to-S3 upload
+ * Generate a pre-signed POST policy for bounded direct client-to-S3 upload
  * @param {string} key - File path / name in bucket (e.g. "reviews/photo-123.jpg")
  * @param {string} contentType - e.g. "image/jpeg", "image/png"
  * @param {number} expiresIn - Expiry in seconds (default 15 minutes)
@@ -36,16 +41,30 @@ export const getPresignedUploadUrl = async (key, contentType, expiresIn = 900) =
     throw new Error('S3 Storage belum dikonfigurasi. Harap isi AWS_SECRET_ACCESS_KEY di .env dengan credential Neon S3 kamu.');
   }
 
-  const command = new PutObjectCommand({
+  const { url, fields } = await createPresignedPost(s3Client, {
     Bucket: BUCKET_NAME,
     Key: key,
-    ContentType: contentType,
+    Expires: expiresIn,
+    Fields: {
+      'Content-Type': contentType,
+      key,
+    },
+    Conditions: [
+      ['content-length-range', 1, MAX_UPLOAD_BYTES],
+      ['eq', '$Content-Type', contentType],
+      ['eq', '$key', key],
+    ],
   });
+  const fileUrl = `${endpoint.replace(/\/+$/, '')}/${BUCKET_NAME}/${key}`;
 
-  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn });
-  const fileUrl = `${process.env.AWS_ENDPOINT_URL_S3}/${BUCKET_NAME}/${key}`;
-
-  return { uploadUrl, fileUrl, key };
+  return {
+    uploadUrl: url,
+    uploadMethod: 'POST',
+    fields,
+    fileUrl,
+    key,
+    maxFileSize: MAX_UPLOAD_BYTES,
+  };
 };
 
 /**

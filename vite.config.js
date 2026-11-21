@@ -7,4 +7,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api': 'http://localhost:4000',
+      '/health/db': 'http://localhost:4000',
+    },
+  },
 })

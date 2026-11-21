@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { query } from '../config/db.js';
+import { query, withTransaction } from '../config/db.js';
 import { resolveUser } from '../utils/userResolver.js';
 
 export const bookmarksRouter = new Hono();
@@ -64,76 +64,80 @@ bookmarksRouter.get('/:uid', async (c) => {
 
 bookmarksRouter.post('/toggle', async (c) => {
   try {
-    const body = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+    }
     const { place_id, note } = body || {};
     const user = c.get('authUser');
+    const placeIdNum = Number(place_id);
 
-    if (!user || !Number.isInteger(Number(place_id)) || Number(place_id) < 1) {
+    if (!user || !Number.isSafeInteger(placeIdNum) || placeIdNum < 1) {
       return c.json({
         success: false,
         message: 'place_id valid wajib disertakan.',
       }, 400);
     }
-
-    const userId = user.id;
-    const placeIdNum = Number(place_id);
-
-    const exist = await query(
-      'SELECT id FROM bookmarks WHERE user_id = $1 AND place_id = $2',
-      [userId, placeIdNum]
-    );
-
-    let bookmarked = false;
-
-    if (exist.rows.length > 0) {
-      // ── UNBOOKMARK ──
-      await query(
-        'DELETE FROM bookmarks WHERE user_id = $1 AND place_id = $2',
-        [userId, placeIdNum]
-      );
-      // Update counter di tabel places
-      await query(
-        'UPDATE places SET total_bookmarks = GREATEST(0, total_bookmarks - 1), updated_at = NOW() WHERE id = $1',
-        [placeIdNum]
-      );
-      bookmarked = false;
-    } else {
-      // ── BOOKMARK ──
-      await query(
-        'INSERT INTO bookmarks (user_id, place_id, note) VALUES ($1, $2, $3)',
-        [userId, placeIdNum, note || null]
-      );
-      // Update counter di tabel places
-      await query(
-        'UPDATE places SET total_bookmarks = total_bookmarks + 1, updated_at = NOW() WHERE id = $1',
-        [placeIdNum]
-      );
-      bookmarked = true;
-
-      // Cek badge 'bookworm' (10 bookmarks) — async, tidak block response
-      query(`
-        INSERT INTO user_badges (user_id, badge_id)
-        SELECT $1, id FROM badges 
-        WHERE code = 'bookworm' 
-          AND (SELECT COUNT(*) FROM bookmarks WHERE user_id = $1) >= 10
-        ON CONFLICT (user_id, badge_id) DO NOTHING
-      `, [userId]).catch(() => {});
+    if (note != null && (typeof note !== 'string' || note.length > 500)) {
+      return c.json({ success: false, message: 'Catatan bookmark tidak valid.' }, 400);
     }
 
-    // Ambil total terkini dari DB
-    const countRes = await query(
-      'SELECT total_bookmarks FROM places WHERE id = $1',
-      [placeIdNum]
-    );
+    const outcome = await withTransaction(async (tx) => {
+      const placeRes = await tx(
+        'SELECT id FROM places WHERE id = $1 FOR UPDATE',
+        [placeIdNum],
+      );
+      if (placeRes.rows.length === 0) return { notFound: true };
+
+      const exist = await tx(
+        'SELECT id FROM bookmarks WHERE user_id = $1 AND place_id = $2',
+        [user.id, placeIdNum],
+      );
+      const bookmarked = exist.rows.length === 0;
+
+      if (bookmarked) {
+        await tx(
+          'INSERT INTO bookmarks (user_id, place_id, note) VALUES ($1, $2, $3)',
+          [user.id, placeIdNum, typeof note === 'string' ? note.trim() || null : null],
+        );
+        await tx(`
+          INSERT INTO user_badges (user_id, badge_id)
+          SELECT $1, id FROM badges
+          WHERE code = 'bookworm'
+            AND (SELECT COUNT(*) FROM bookmarks WHERE user_id = $1) >= 10
+          ON CONFLICT (user_id, badge_id) DO NOTHING
+        `, [user.id]);
+      } else {
+        await tx(
+          'DELETE FROM bookmarks WHERE user_id = $1 AND place_id = $2',
+          [user.id, placeIdNum],
+        );
+      }
+
+      const countRes = await tx(
+        'SELECT total_bookmarks FROM places WHERE id = $1',
+        [placeIdNum],
+      );
+      return {
+        bookmarked,
+        totalBookmarks: countRes.rows[0]?.total_bookmarks || 0,
+      };
+    });
+
+    if (outcome.notFound) {
+      return c.json({ success: false, message: 'Spot nugas tidak ditemukan.' }, 404);
+    }
 
     console.log(
-      `[BOOKMARK] user=${userId} place=${placeIdNum} → ${bookmarked ? 'SAVED' : 'REMOVED'}`
+      `[BOOKMARK] user=${user.id} place=${placeIdNum} → ${outcome.bookmarked ? 'SAVED' : 'REMOVED'}`
     );
 
     return c.json({
       success: true,
-      bookmarked,
-      total_bookmarks: countRes.rows[0]?.total_bookmarks || 0,
+      bookmarked: outcome.bookmarked,
+      total_bookmarks: outcome.totalBookmarks,
     });
   } catch (err) {
     console.error('[BOOKMARK TOGGLE ERROR]:', err.message);

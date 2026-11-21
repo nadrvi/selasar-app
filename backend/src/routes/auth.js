@@ -4,12 +4,18 @@ import { query } from '../config/db.js';
 import {
   firebaseProjectId,
   issueAuthToken,
+  verifyAuthToken,
   verifyFirebaseIdToken,
 } from '../utils/authTokens.js';
 
 export const authRouter = new Hono();
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SOCIAL_SIGN_IN_PROVIDERS = new Set([
+  'google.com',
+  'facebook.com',
+  'github.com',
+]);
 
 function logAuthEvent(c, event, details = {}) {
   console.info(
@@ -223,127 +229,188 @@ authRouter.post('/login', async (c) => {
   }, 410);
 });
 
-authRouter.post('/session', async (c) => {
-  const body = await readBody(c);
-  const idToken = body?.id_token;
-  if (typeof idToken !== 'string' || idToken.length > 8192) {
-    return c.json({ success: false, message: 'Token Firebase tidak valid.' }, 401);
-  }
-  if (!firebaseProjectId) {
-    logAuthEvent(c, 'session.unavailable', { reason: 'missing_project_configuration' });
-    return c.json({ success: false, message: 'Login sedang tidak tersedia.' }, 503);
-  }
-
-  let claims;
-  try {
-    claims = await verifyFirebaseIdToken(idToken);
-  } catch (error) {
-    logAuthError(c, '/session/firebase-verification', error);
-    return c.json({ success: false, message: 'Verifikasi login sedang tidak tersedia.' }, 503);
-  }
-  if (
-    !claims ||
-    claims.email_verified !== true ||
-    !isValidEmail(claims.email)
-  ) {
-    logAuthEvent(c, 'session.failed', { reason: 'invalid_firebase_token' });
-    return c.json({ success: false, message: 'Token Firebase tidak valid.' }, 401);
-  }
-
-  const firebaseUid = claims.sub;
-  const cleanEmail = claims.email.trim().toLowerCase();
-  const displayName = socialProfileValue(claims.name, 100);
-  const avatarUrl = safeAvatarUrl(claims.picture);
-
-  try {
-    const [uidRes, emailRes] = await Promise.all([
-      query(
-        `SELECT id, firebase_uid, email, username, display_name, avatar_url,
-                role, is_banned, is_verified, birthday, created_at
-         FROM users WHERE firebase_uid = $1`,
-        [firebaseUid],
-      ),
-      query(
-        `SELECT id, firebase_uid, email, username, display_name, avatar_url,
-                role, is_banned, is_verified, birthday, created_at
-         FROM users WHERE LOWER(email) = $1`,
-        [cleanEmail],
-      ),
-    ]);
-    const byUid = uidRes.rows[0];
-    const byEmail = emailRes.rows[0];
-
-    if (byUid && byEmail && byUid.id !== byEmail.id) {
-      logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
-      return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
+export function createFirebaseSessionHandler({
+  allowSocialSignup = false,
+  queryFn = query,
+  verifyIdToken = verifyFirebaseIdToken,
+  issueToken = issueAuthToken,
+} = {}) {
+  return async (c) => {
+    const body = await readBody(c);
+    const idToken = body?.id_token;
+    if (typeof idToken !== 'string' || idToken.length > 8192) {
+      return c.json({ success: false, message: 'Token Firebase tidak valid.' }, 401);
+    }
+    if (!firebaseProjectId) {
+      logAuthEvent(c, 'session.unavailable', { reason: 'missing_project_configuration' });
+      return c.json({ success: false, message: 'Login sedang tidak tersedia.' }, 503);
     }
 
-    const existing = byUid || byEmail;
-    if (existing?.is_banned) {
-      logAuthEvent(c, 'session.failed', { reason: 'banned_user' });
-      return c.json({ success: false, message: 'Akun ini sedang ditangguhkan.' }, 403);
+    let claims;
+    try {
+      claims = await verifyIdToken(idToken);
+    } catch (error) {
+      logAuthError(c, '/session/firebase-verification', error);
+      return c.json({ success: false, message: 'Verifikasi login sedang tidak tersedia.' }, 503);
     }
-    if (existing?.firebase_uid && existing.firebase_uid !== firebaseUid) {
-      logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
-      return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
+    if (
+      !claims ||
+      claims.email_verified !== true ||
+      !isValidEmail(claims.email)
+    ) {
+      logAuthEvent(c, 'session.failed', { reason: 'invalid_firebase_token' });
+      return c.json({ success: false, message: 'Token Firebase tidak valid.' }, 401);
+    }
+    if (
+      allowSocialSignup &&
+      !SOCIAL_SIGN_IN_PROVIDERS.has(claims.firebase?.sign_in_provider)
+    ) {
+      logAuthEvent(c, 'social_register.failed', { reason: 'invalid_sign_in_provider' });
+      return c.json({ success: false, message: 'Pendaftaran sosial tidak valid.' }, 400);
     }
 
-    let user;
-    let status = 200;
-    if (existing) {
-      const updateRes = await query(`
-        UPDATE users SET
-          firebase_uid = $1,
-          email = $2,
-          password_hash = NULL,
-          display_name = COALESCE($3, users.display_name),
-          avatar_url = COALESCE(users.avatar_url, $4),
-          is_verified = TRUE,
-          last_login_at = NOW(),
-          updated_at = NOW()
-        WHERE id = $5
-        RETURNING id, username, email, display_name, avatar_url, role,
-                  is_verified, birthday, created_at
-      `, [firebaseUid, cleanEmail, displayName, avatarUrl, existing.id]);
-      user = updateRes.rows[0];
-    } else {
-      const base = cleanEmail.split('@')[0]
-        .replace(/[^a-z0-9_]/g, '')
-        .slice(0, 15) || 'user';
-      const username = `${base}_${randomBytes(4).toString('hex')}`;
-      const insertRes = await query(`
-        INSERT INTO users (
-          firebase_uid, email, username, display_name, avatar_url,
-          is_verified, last_login_at, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW(), NOW())
-        RETURNING id, username, email, display_name, avatar_url, role,
-                  is_verified, birthday, created_at
-      `, [
-        firebaseUid,
-        cleanEmail,
-        username,
-        displayName || username,
-        avatarUrl,
+    const firebaseUid = claims.sub;
+    const cleanEmail = claims.email.trim().toLowerCase();
+    const displayName = socialProfileValue(claims.name, 100);
+    const avatarUrl = safeAvatarUrl(claims.picture);
+
+    try {
+      const [uidRes, emailRes] = await Promise.all([
+        queryFn(
+          `SELECT id, firebase_uid, email, username, display_name, avatar_url,
+                  role, is_banned, is_verified, birthday, created_at
+           FROM users WHERE firebase_uid = $1`,
+          [firebaseUid],
+        ),
+        queryFn(
+          `SELECT id, firebase_uid, email, username, display_name, avatar_url,
+                  role, is_banned, is_verified, birthday, created_at
+           FROM users WHERE LOWER(email) = $1`,
+          [cleanEmail],
+        ),
       ]);
-      user = insertRes.rows[0];
-      status = 201;
-    }
+      const byUid = uidRes.rows[0];
+      const byEmail = emailRes.rows[0];
 
-    const token = issueAuthToken(user.id);
-    logAuthEvent(c, 'session.succeeded');
-    return c.json({
-      success: true,
-      message: 'Login berhasil.',
-      token,
-      data: user,
-    }, status);
-  } catch (error) {
-    if (error?.code === '23505') {
-      logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
-      return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
+      if (byUid && byEmail && byUid.id !== byEmail.id) {
+        logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
+        return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
+      }
+
+      const existing = byUid || byEmail;
+      if (!existing && !allowSocialSignup) {
+        logAuthEvent(c, 'session.failed', { reason: 'account_not_found' });
+        return c.json({
+          success: false,
+          message: 'Akun Selasar tidak ditemukan. Silakan daftar terlebih dahulu.',
+        }, 403);
+      }
+      if (existing?.is_banned) {
+        logAuthEvent(c, 'session.failed', { reason: 'banned_user' });
+        return c.json({ success: false, message: 'Akun ini sedang ditangguhkan.' }, 403);
+      }
+      if (existing?.firebase_uid && existing.firebase_uid !== firebaseUid) {
+        logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
+        return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
+      }
+
+      let user;
+      let status = 200;
+      if (existing) {
+        const updateRes = await queryFn(`
+          UPDATE users SET
+            firebase_uid = $1,
+            email = $2,
+            password_hash = NULL,
+            display_name = COALESCE($3, users.display_name),
+            avatar_url = COALESCE(users.avatar_url, $4),
+            is_verified = TRUE,
+            last_login_at = NOW(),
+            updated_at = NOW()
+          WHERE id = $5
+          RETURNING id, username, email, display_name, avatar_url, role,
+                    is_verified, birthday, created_at
+        `, [firebaseUid, cleanEmail, displayName, avatarUrl, existing.id]);
+        user = updateRes.rows[0];
+      } else {
+        const base = cleanEmail.split('@')[0]
+          .replace(/[^a-z0-9_]/g, '')
+          .slice(0, 15) || 'user';
+        const username = `${base}_${randomBytes(4).toString('hex')}`;
+        const insertRes = await queryFn(`
+          INSERT INTO users (
+            firebase_uid, email, username, display_name, avatar_url,
+            is_verified, last_login_at, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW(), NOW())
+          RETURNING id, username, email, display_name, avatar_url, role,
+                    is_verified, birthday, created_at
+        `, [
+          firebaseUid,
+          cleanEmail,
+          username,
+          displayName || username,
+          avatarUrl,
+        ]);
+        user = insertRes.rows[0];
+        status = 201;
+      }
+
+      const token = issueToken(user.id);
+      const tokenClaims = verifyAuthToken(token);
+      if (!tokenClaims) {
+        throw new Error('Backend session token could not be verified');
+      }
+      await queryFn(`
+        INSERT INTO auth_sessions (jti, user_id, expires_at)
+        VALUES ($1, $2, TO_TIMESTAMP($3))
+      `, [tokenClaims.jti, user.id, tokenClaims.exp]);
+      await queryFn(`
+        DELETE FROM auth_sessions
+        WHERE expires_at <= NOW()
+           OR revoked_at < NOW() - INTERVAL '30 days'
+      `);
+      logAuthEvent(c, 'session.succeeded');
+      return c.json({
+        success: true,
+        message: 'Login berhasil.',
+        token,
+        data: user,
+      }, status);
+    } catch (error) {
+      if (error?.code === '23505') {
+        logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
+        return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
+      }
+      logAuthError(c, allowSocialSignup ? '/register/social' : '/session', error);
+      return c.json({ success: false, message: 'Login gagal karena kesalahan server.' }, 500);
     }
-    logAuthError(c, '/session', error);
-    return c.json({ success: false, message: 'Login gagal karena kesalahan server.' }, 500);
+  };
+}
+
+authRouter.post('/session', createFirebaseSessionHandler());
+authRouter.post(
+  '/register/social',
+  createFirebaseSessionHandler({ allowSocialSignup: true }),
+);
+
+authRouter.post('/logout', async (c) => {
+  const user = c.get('authUser');
+  const claims = c.get('authClaims');
+  if (!user || !claims) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+
+  try {
+    await query(
+      `UPDATE auth_sessions
+       SET revoked_at = NOW()
+       WHERE jti = $1 AND user_id = $2 AND revoked_at IS NULL`,
+      [claims.jti, user.id],
+    );
+    return c.json({ success: true, message: 'Sesi berhasil diakhiri.' });
+  } catch (error) {
+    logAuthError(c, '/logout', error);
+    return c.json({ success: false, message: 'Gagal mengakhiri sesi.' }, 500);
   }
 });
 

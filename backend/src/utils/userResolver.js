@@ -12,15 +12,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export async function resolveUser(identifier) {
   if (!identifier) return null;
 
-  let uid = null;
-  let email = null;
-
-  if (typeof identifier === 'object') {
-    uid = identifier.uid || identifier.user_id || identifier.firebase_uid || null;
-    email = identifier.email || null;
-  } else {
-    uid = String(identifier).trim();
-  }
+  const uid = typeof identifier === 'object'
+    ? identifier.uid || identifier.user_id || identifier.firebase_uid || null
+    : String(identifier).trim();
+  const email = typeof identifier === 'object' ? identifier.email || null : null;
 
   // 1. Coba lookup via firebase_uid (untuk akun Google / Sosial)
   if (uid) {

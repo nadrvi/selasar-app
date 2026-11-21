@@ -3,3 +3,4 @@ node_modules/
 .DS_Store
 *.log
 selasar_database.sql
+readme.md

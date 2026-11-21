@@ -41,8 +41,8 @@ DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-selasar.ap-southeast-1.
 
 # Neon S3 Storage
 AWS_ENDPOINT_URL_S3="https://br-falling-fog-b3nc922j.storage.c-4.ap-southeast-1.aws.neon.tech"
-AWS_ACCESS_KEY_ID="nak_live_0b34bfa910f04651ab999b164c94ee2a"
-AWS_SECRET_ACCESS_KEY="*************"
+AWS_ACCESS_KEY_ID="YOUR_AWS_ACCESS_KEY_ID"
+AWS_SECRET_ACCESS_KEY="YOUR_AWS_SECRET_ACCESS_KEY"
 AWS_REGION="ap-southeast-1"
 S3_BUCKET_NAME="selasar-assets"
 
@@ -61,7 +61,10 @@ FIREBASE_PROJECT_ID="loginprojectregister"
 Firebase Auth adalah sumber kebenaran untuk login email/password, verifikasi,
 reset, dan perubahan kata sandi. Backend tidak memeriksa atau menyimpan password;
 registrasi meminta Firebase ID token dan login menukarkan token terverifikasi
-melalui `POST /api/auth/session`. Token sesi API berlaku 12 jam.
+melalui `POST /api/auth/session`. Endpoint sesi hanya menerima user yang sudah
+terdaftar di PostgreSQL; pendaftaran sosial dilakukan secara eksplisit melalui
+`POST /api/auth/register/social`, sehingga login tidak membuat ulang user yang
+telah dihapus dari database. Token sesi API berlaku 8 jam.
 Semua endpoint yang mengubah data serta endpoint profil/bookmark/check-in pribadi
 membutuhkan `Authorization: Bearer <token>`; identitas perubahan diambil dari token,
 bukan dari ID user yang dikirim client.
@@ -86,6 +89,10 @@ untuk menghapus hash password PostgreSQL lama yang tidak lagi dipakai.
    ```
 3. Server akan aktif di `http://localhost:4000`
 
+Server Hono yang sama juga diekspor dari `src/app.js` untuk entry point
+Cloudflare Worker. Konfigurasi deploy full-stack dan langkah Hyperdrive berada
+di bagian **Deploy to Cloudflare** pada README root.
+
 ---
 
 ## 📡 Daftar Endpoint REST API
@@ -96,7 +103,9 @@ untuk menghapus hash password PostgreSQL lama yang tidak lagi dipakai.
 
 ### 2. Authentication
 - `POST /api/auth/register` — Simpan profil setelah Firebase membuat akun
+- `POST /api/auth/register/social` — Daftarkan akun Google/Facebook/GitHub
 - `POST /api/auth/session` — Tukar Firebase ID token terverifikasi dengan token API
+- `POST /api/auth/logout` — Cabut sesi API aktif; logout client tetap menghapus sesi lokal jika server gagal
 - `POST /api/auth/login` — Endpoint lama; login password backend sudah dinonaktifkan
 - `POST /api/auth/change-password` — Endpoint lama; perubahan password dilakukan di Firebase
 
@@ -106,7 +115,7 @@ untuk menghapus hash password PostgreSQL lama yang tidak lagi dipakai.
 - `GET /api/places/:id` — Detail spot (berdasarkan ID atau Slug)
 
 ### 4. Reviews & Ratings
-- `GET /api/reviews/place/:placeId` — Ambil seluruh ulasan & ringkasan bintang
+- `GET /api/reviews/place/:placeId` — Ambil halaman ulasan & ringkasan; mendukung `sort`, `limit` (maks. 100), dan `offset` (maks. 10000)
 - `POST /api/reviews` — Tambah / edit ulasan dengan sub-rating (WiFi, suasana, colokan, harga)
 - `POST /api/reviews/:id/helpful` — Toggle voting "Ulasan ini membantu"
 
@@ -125,6 +134,23 @@ untuk menghapus hash password PostgreSQL lama yang tidak lagi dipakai.
 
 ### 8. File Storage (Neon S3)
 - `POST /api/storage/presigned-url` — Request URL upload langsung client-ke-S3 untuk foto ulasan atau avatar
+  - Upload menggunakan `POST` multipart/form-data ke URL yang dikembalikan, sertakan seluruh `fields` respons dan file.
+  - Maksimum 5 MiB; hanya JPEG, PNG, WebP, dan GIF; folder hanya `reviews` atau `avatars`.
+
+## Upgrade backend hardening
+
+Sebelum deploy versi ini pada database yang sudah berisi data, buat backup lalu jalankan
+migrasi satu kali dari folder `backend` dengan `DATABASE_URL` yang menunjuk ke database target:
+
+```sh
+npm run migrate:harden-backend
+```
+
+Migrasi menyiapkan tabel sesi/rate-limit dan memastikan hanya ada satu check-in aktif per
+pengguna. Deploy backend setelah migrasi berhasil. Token API lama tidak memiliki entri
+sesi server-side dan mengharuskan pengguna login kembali. Jangan jalankan
+`selasar_database.sql` pada database yang sudah terisi; file tersebut hanya untuk
+bootstrap database baru.
 
 ### 9. Promos
 - `GET /api/promos` — Banner promo dan event aktif

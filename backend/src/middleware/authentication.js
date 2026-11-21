@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { verifyAuthToken } from '../utils/authTokens.js';
 import { getConnInfo } from '@hono/node-server/conninfo';
 
@@ -6,19 +7,30 @@ const PRIVATE_READ_PATTERNS = [
   /^\/api\/bookmarks\/([^/]+)(?:\/check\/[^/]+)?$/,
   /^\/api\/checkins\/user\/([^/]+)$/,
 ];
-const AUTH_RATE_LIMITS = new Map([
-  ['/api/auth/register', 10],
-  ['/api/auth/login', 20],
-  ['/api/auth/session', 30],
-  ['/api/auth/change-password', 10],
+const RATE_LIMITS = new Map([
+  ['POST /api/auth/register', 10],
+  ['POST /api/auth/register/social', 10],
+  ['POST /api/auth/login', 20],
+  ['POST /api/auth/session', 30],
+  ['POST /api/auth/logout', 30],
+  ['POST /api/auth/change-password', 10],
+  ['POST /api/storage/presigned-url', 20],
+  ['GET /api/places', 300],
+  ['GET /api/reviews/place', 300],
 ]);
 const RATE_WINDOW_MS = 15 * 60 * 1000;
-const MAX_RATE_BUCKETS = 10000;
-const rateBuckets = new Map();
 let rateChecks = 0;
 
-function isRateLimited(c, path, now = Date.now()) {
-  const limit = AUTH_RATE_LIMITS.get(path);
+function getRateLimitKey(method, path) {
+  if (method === 'GET' && /^\/api\/reviews\/place\/[^/]+$/.test(path)) {
+    return 'GET /api/reviews/place';
+  }
+  const key = `${method} ${path}`;
+  return RATE_LIMITS.has(key) ? key : null;
+}
+
+async function isRateLimited(c, key, query) {
+  const limit = RATE_LIMITS.get(key);
   if (!limit) return 0;
 
   let address = 'unknown';
@@ -27,45 +39,67 @@ function isRateLimited(c, path, now = Date.now()) {
   } catch {
     // Framework-level tests may not have a Node socket.
   }
-  const key = `${path}:${address}`;
-  let bucket = rateBuckets.get(key);
-  if (!bucket || now >= bucket.expiresAt) {
-    if (rateBuckets.size >= MAX_RATE_BUCKETS) {
-      for (const [bucketKey, value] of rateBuckets) {
-        if (now >= value.expiresAt) rateBuckets.delete(bucketKey);
-      }
-    }
-    if (rateBuckets.size >= MAX_RATE_BUCKETS) return RATE_WINDOW_MS;
-    bucket = { count: 0, expiresAt: now + RATE_WINDOW_MS };
+  if (
+    address === 'unknown' &&
+    process.env.SELASAR_WORKER_RUNTIME === 'cloudflare'
+  ) {
+    address = c.req.header('CF-Connecting-IP') || address;
   }
-  bucket.count += 1;
-  rateBuckets.set(key, bucket);
+  const bucketKey = `${key}:${address}`;
+  const result = await query(`
+    INSERT INTO api_rate_limits (bucket_key, window_started_at, request_count, expires_at)
+    VALUES ($1, NOW(), 1, NOW() + ($2 * INTERVAL '1 millisecond'))
+    ON CONFLICT (bucket_key) DO UPDATE SET
+      window_started_at = CASE
+        WHEN api_rate_limits.expires_at <= NOW() THEN NOW()
+        ELSE api_rate_limits.window_started_at
+      END,
+      request_count = CASE
+        WHEN api_rate_limits.expires_at <= NOW() THEN 1
+        ELSE api_rate_limits.request_count + 1
+      END,
+      expires_at = CASE
+        WHEN api_rate_limits.expires_at <= NOW()
+          THEN NOW() + ($2 * INTERVAL '1 millisecond')
+        ELSE api_rate_limits.expires_at
+      END
+    RETURNING request_count,
+      GREATEST(1, CEIL(EXTRACT(EPOCH FROM (expires_at - NOW()))))::integer
+        AS retry_after_seconds
+  `, [bucketKey, RATE_WINDOW_MS]);
 
   rateChecks += 1;
-  if (rateChecks % 256 === 0) {
-    for (const [bucketKey, value] of rateBuckets) {
-      if (now >= value.expiresAt) rateBuckets.delete(bucketKey);
-    }
+  if (rateChecks % 512 === 0) {
+    await query('DELETE FROM api_rate_limits WHERE expires_at < NOW()');
   }
 
-  return bucket.count > limit ? Math.ceil((bucket.expiresAt - now) / 1000) : 0;
+  const row = result.rows[0];
+  return row?.request_count > limit
+    ? Number(row.retry_after_seconds) || 1
+    : 0;
 }
 
 export function createAuthenticationMiddleware(query) {
   return async (c, next) => {
     const path = c.req.path;
     const method = c.req.method.toUpperCase();
+    const rateLimitKey = getRateLimitKey(method, path);
     const isPublicAuthEndpoint =
       method === 'POST' &&
-      ['/api/auth/register', '/api/auth/login', '/api/auth/session'].includes(path);
+      [
+        '/api/auth/register',
+        '/api/auth/register/social',
+        '/api/auth/login',
+        '/api/auth/session',
+      ].includes(path);
 
-    if (method === 'POST' && AUTH_RATE_LIMITS.has(path)) {
-      const retryAfter = isRateLimited(c, path);
+    if (rateLimitKey) {
+      const retryAfter = await isRateLimited(c, rateLimitKey, query);
       if (retryAfter > 0) {
         console.warn(JSON.stringify({
           event: 'auth.rate_limited',
           requestId: c.get('requestId') || null,
-          path,
+          path: rateLimitKey,
         }));
         c.header('Retry-After', String(retryAfter));
         return c.json({ success: false, message: 'Terlalu banyak percobaan. Coba lagi nanti.' }, 429);
@@ -77,6 +111,9 @@ export function createAuthenticationMiddleware(query) {
     const privateReadMatch =
       ['GET', 'HEAD'].includes(method) &&
       PRIVATE_READ_PATTERNS.map((pattern) => path.match(pattern)).find(Boolean);
+    const privateProfileWriteMatch =
+      ['PUT', 'PATCH', 'DELETE'].includes(method) &&
+      path.match(PRIVATE_READ_PATTERNS[0]);
     const requiresAuthentication =
       ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ||
       Boolean(privateReadMatch);
@@ -96,9 +133,14 @@ export function createAuthenticationMiddleware(query) {
     }
 
     const userRes = await query(
-      `SELECT id, firebase_uid, username, role, is_banned
-       FROM users WHERE id = $1`,
-      [claims.sub],
+      `SELECT u.id, u.firebase_uid, u.username, u.role, u.is_banned
+       FROM users u
+       JOIN auth_sessions s ON s.user_id = u.id
+       WHERE u.id = $1
+         AND s.jti = $2
+         AND s.revoked_at IS NULL
+         AND s.expires_at > NOW()`,
+      [claims.sub, claims.jti],
     );
     const user = userRes.rows[0];
     if (!user || user.is_banned) {
@@ -111,11 +153,13 @@ export function createAuthenticationMiddleware(query) {
       return c.json({ success: false, message: 'Sesi tidak valid.' }, 401);
     }
     c.set('authUser', user);
+    c.set('authClaims', claims);
 
-    if (privateReadMatch) {
+    const privateResourceMatch = privateReadMatch || privateProfileWriteMatch;
+    if (privateResourceMatch) {
       let requestedIdentifier;
       try {
-        requestedIdentifier = decodeURIComponent(privateReadMatch[1]);
+        requestedIdentifier = decodeURIComponent(privateResourceMatch[1]);
       } catch {
         return c.json({ success: false, message: 'Identitas user tidak valid.' }, 400);
       }

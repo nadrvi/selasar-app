@@ -10,7 +10,7 @@ import process from 'node:process';
 
 const TOKEN_ISSUER = 'selasar-api';
 const TOKEN_AUDIENCE = 'selasar-client';
-const TOKEN_TTL_SECONDS = 12 * 60 * 60;
+const TOKEN_TTL_SECONDS = 8 * 60 * 60;
 const MAX_TOKEN_LENGTH = 8192;
 const FIREBASE_CERT_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -117,6 +117,8 @@ export function verifyAuthToken(token) {
     claims.aud !== TOKEN_AUDIENCE ||
     typeof claims.sub !== 'string' ||
     !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(claims.sub) ||
+    typeof claims.jti !== 'string' ||
+    !/^[0-9a-f]{32}$/.test(claims.jti) ||
     !Number.isInteger(claims.iat) ||
     !Number.isInteger(claims.exp) ||
     claims.iat > now + 60 ||

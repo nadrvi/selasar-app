@@ -1,8 +1,44 @@
 import { Hono } from 'hono';
-import { getPresignedUploadUrl, isS3Configured } from '../config/s3.js';
-import { randomUUID } from 'crypto';
+import {
+  getPresignedUploadUrl,
+  isS3Configured,
+} from '../config/s3.js';
+import { randomUUID } from 'node:crypto';
 
 export const storageRouter = new Hono();
+
+const ALLOWED_FOLDERS = new Set(['reviews', 'avatars']);
+const ALLOWED_CONTENT_TYPES = new Map([
+  ['jpg', 'image/jpeg'],
+  ['jpeg', 'image/jpeg'],
+  ['png', 'image/png'],
+  ['webp', 'image/webp'],
+  ['gif', 'image/gif'],
+]);
+
+export function validateUploadRequest(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+
+  const filename = typeof body.filename === 'string' ? body.filename.trim() : '';
+  const folder = body.folder ?? 'reviews';
+  const extension = filename.split('.').pop()?.toLowerCase();
+  const expectedContentType = ALLOWED_CONTENT_TYPES.get(extension);
+  const contentType = body.contentType ?? 'image/jpeg';
+
+  if (
+    filename.length === 0 ||
+    filename.length > 255 ||
+    /[\\/]/.test(filename) ||
+    !expectedContentType ||
+    typeof folder !== 'string' ||
+    !ALLOWED_FOLDERS.has(folder) ||
+    contentType !== expectedContentType
+  ) {
+    return null;
+  }
+
+  return { filename, folder, extension, contentType };
+}
 
 // POST /api/storage/presigned-url - Get direct upload URL to Neon S3
 storageRouter.post('/presigned-url', async (c) => {
@@ -14,29 +50,31 @@ storageRouter.post('/presigned-url', async (c) => {
       }, 503);
     }
 
-    const { folder = 'general', filename, contentType = 'image/jpeg' } = await c.req.json();
-
-    if (!filename) {
-      return c.json({ success: false, message: 'filename wajib disertakan' }, 400);
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+    }
+    const upload = validateUploadRequest(body);
+    if (!upload) {
+      return c.json({
+        success: false,
+        message: 'Folder, nama file, atau tipe file tidak diizinkan.',
+      }, 400);
     }
 
-    const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
-    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-    if (!allowedExts.includes(ext)) {
-      return c.json({ success: false, message: `Ekstensi .${ext} tidak diizinkan. Gunakan JPG, PNG, atau WEBP.` }, 400);
-    }
+    const key = `${upload.folder}/${Date.now()}-${randomUUID()}.${upload.extension}`;
 
-    const key = `${folder}/${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
-
-    const { uploadUrl, fileUrl } = await getPresignedUploadUrl(key, contentType, 900);
+    const uploadDetails = await getPresignedUploadUrl(
+      key,
+      upload.contentType,
+      900,
+    );
 
     return c.json({
       success: true,
-      data: {
-        uploadUrl,
-        fileUrl,
-        key,
-      },
+      data: uploadDetails,
     });
   } catch (err) {
     console.error('Error generating presigned url:', err);

@@ -10,6 +10,7 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { auth } from "../data/firebase";
+import { logoutAuthSession } from "../services/api";
 import {
   FaArrowLeft,
   FaUser,
@@ -405,20 +406,36 @@ export default function Settings() {
     }
   };
 
-  const handleLogoutConfirm = () => {
+  const handleLogoutConfirm = async () => {
     setLoggingOut(true);
-    setTimeout(() => {
+    const errors = [];
+    try {
+      if (localStorage.getItem("authToken")) {
+        await logoutAuthSession();
+      }
+    } catch (error) {
+      console.error("Backend logout failed:", error);
+      errors.push("Sesi server mungkin masih aktif sampai token kedaluwarsa.");
+    }
+
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Firebase logout failed:", error);
+      errors.push("Gagal mengakhiri sesi Firebase.");
+    } finally {
       localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("selasarUser");
       localStorage.removeItem("authToken");
-      signOut(auth).catch((error) => {
-        console.error("Firebase logout failed:", error);
-      });
       setLoggingOut(false);
       setActiveModal(null);
-      showToast("Berhasil keluar akun");
+      if (errors.length > 0) {
+        window.alert(`Anda sudah keluar dari perangkat ini, tetapi: ${errors.join(" ")}`);
+      } else {
+        showToast("Berhasil keluar akun");
+      }
       handleNavigate("/");
-    }, 600);
+    }
   };
 
   const faqs = [

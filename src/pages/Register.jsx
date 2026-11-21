@@ -16,7 +16,11 @@ import {
   githubProvider,
 } from "../data/firebase";
 import { useTheme } from "../context/ThemeContext";
-import { apiRegister, apiFirebaseSession } from "../services/api";
+import {
+  apiRegister,
+  apiFirebaseSession,
+  apiFirebaseSocialRegister,
+} from "../services/api";
 
 import logoSelasar from "../assets/Logo.png";
 import Daun from "../assets/Daun.png";
@@ -40,6 +44,9 @@ const sanitizeInput = (val) => {
   if (typeof val !== "string") return "";
   return val.replace(/[<>]/g, "").trim();
 };
+
+const today = new Date();
+const maxBirthday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -352,7 +359,7 @@ export default function Register() {
       const idToken = await user.getIdToken();
 
       // Simpan langsung ke database PostgreSQL (selasar-db)
-      const dbUser = await apiFirebaseSession({ id_token: idToken });
+      const dbUser = await apiFirebaseSocialRegister({ id_token: idToken });
       if (!dbUser?.token || !dbUser?.data?.id) {
         throw new Error("Respons login server tidak lengkap.");
       }
@@ -740,17 +747,15 @@ export default function Register() {
             <div>
               <div className="relative flex items-center">
                 <input
-                  type="text"
+                  type="date"
                   name="birthday"
                   ref={dateInputRef}
                   value={formData.birthday}
                   onChange={handleChange}
                   disabled={isSubmitting}
-                  placeholder="Masukkan tanggal lahir (HH/BB/TTTT)"
-                  onFocus={(e) => (e.target.type = "date")}
-                  onBlur={(e) => {
-                    if (!e.target.value) e.target.type = "text";
-                  }}
+                  max={maxBirthday}
+                  lang="id"
+                  aria-label="Tanggal lahir"
                   className="w-full pl-4 sm:pl-5 pr-20 py-3.5 rounded-2xl bg-white dark:bg-[#1F1B18] text-gray-900 dark:text-[#F5F2EB] text-sm font-medium border-2 border-gray-200 dark:border-[#3D342D] focus:border-[#594A42] dark:focus:border-[#C4A876] transition-all outline-none placeholder-gray-400"
                 />
 
@@ -782,7 +787,6 @@ export default function Register() {
                     tabIndex={-1}
                     onClick={() => {
                       if (dateInputRef.current) {
-                        dateInputRef.current.type = "date";
                         if (
                           typeof dateInputRef.current.showPicker === "function"
                         ) {
@@ -795,7 +799,6 @@ export default function Register() {
                     className="p-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
                     aria-label="Buka pemilih tanggal"
                   >
-                    <Calendar size={18} />
                   </button>
                 </div>
               </div>
