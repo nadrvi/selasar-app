@@ -2,8 +2,9 @@ import "dotenv/config";
 
 import { serve } from "@hono/node-server";
 import process from "node:process";
-import app from "./app.js";
-import * as db from "./config/db.js";
+import app from "./app.ts";
+import * as db from "./config/db.ts";
+import { logServerError } from "./utils/errors.ts";
 
 const port = Number(process.env.PORT) || 4000;
 
@@ -18,13 +19,13 @@ const server = serve(
 );
 
 server.on("error", (err) => {
-  console.error("Server error:", err.message);
+  logServerError("http.server.error", err);
   process.exit(1);
 });
 
 let shuttingDown = false;
 
-const shutdown = (signal, exitCode = 0) => {
+const shutdown = (signal: string, exitCode = 0) => {
   if (shuttingDown) return;
   shuttingDown = true;
 
@@ -41,22 +42,24 @@ const shutdown = (signal, exitCode = 0) => {
       await db.pool?.end?.();
       console.log("Database pool closed.");
     } catch (err) {
-      console.error("Failed to close database pool:", err.message);
+      logServerError("db.pool.close_error", err);
     }
     process.exit(exitCode);
   });
 
-  server.closeIdleConnections?.();
+  if ("closeIdleConnections" in server && typeof server.closeIdleConnections === "function") {
+    server.closeIdleConnections();
+  }
 };
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection:", reason);
+  logServerError("process.unhandled_rejection", reason);
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception:", err);
+  logServerError("process.uncaught_exception", err);
   shutdown("uncaughtException", 1);
 });

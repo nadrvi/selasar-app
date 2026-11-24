@@ -1,5 +1,6 @@
 import process from 'node:process';
-import { pool, query } from '../config/db.js';
+import { pool, query } from '../config/db.ts';
+import { getErrorCode } from '../utils/errors.ts';
 
 async function secureSeedAccounts() {
   try {
@@ -23,7 +24,7 @@ async function secureSeedAccounts() {
   } catch (error) {
     console.error(JSON.stringify({
       event: 'migration.secure_seed_accounts.failed',
-      code: error.code || 'UNKNOWN',
+      code: getErrorCode(error),
     }));
     process.exitCode = 1;
   } finally {

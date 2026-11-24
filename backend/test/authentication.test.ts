@@ -4,36 +4,38 @@ import { createHmac, generateKeyPairSync, sign as signSignature } from 'node:cry
 import process from 'node:process';
 import test from 'node:test';
 import { Hono } from 'hono';
+import type { QueryFunction } from '../src/config/db.ts';
 
 process.env.NODE_ENV = 'test';
 process.env.AUTH_TOKEN_SECRET = 'test-only-auth-secret-with-at-least-32-bytes';
 process.env.FIREBASE_PROJECT_ID = 'selasar-test-project';
 
 const { issueAuthToken, verifyAuthToken, verifyFirebaseIdToken } =
-  await import('../src/utils/authTokens.js');
+  await import('../src/utils/authTokens.ts');
 const { createAuthenticationMiddleware } =
-  await import('../src/middleware/authentication.js');
+  await import('../src/middleware/authentication.ts');
 const { createFirebaseSessionHandler } =
-  await import('../src/routes/auth.js');
+  await import('../src/routes/auth.ts');
 
 const userId = 'c0a80101-0000-4000-8000-000000000001';
 
-function signAppToken(claims) {
+function signAppToken(claims: Record<string, unknown>) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
   const input = `${header}.${payload}`;
-  const signature = createHmac('sha256', process.env.AUTH_TOKEN_SECRET)
+  const signature = createHmac('sha256', process.env.AUTH_TOKEN_SECRET!)
     .update(input)
     .digest('base64url');
   return `${input}.${signature}`;
 }
 
-function createTestApp(query) {
+function createTestApp(query: QueryFunction) {
   const rateCounts = new Map();
-  const databaseQuery = async (sql, params) => {
+  const databaseQuery: QueryFunction = async (sql, params) => {
     if (sql.includes('INSERT INTO api_rate_limits')) {
-      const count = (rateCounts.get(params[0]) || 0) + 1;
-      rateCounts.set(params[0], count);
+      const bucket = String(params?.[0]);
+      const count = (rateCounts.get(bucket) || 0) + 1;
+      rateCounts.set(bucket, count);
       return { rows: [{ request_count: count, retry_after_seconds: 900 }] };
     }
     if (sql.includes('JOIN auth_sessions')) {
@@ -118,7 +120,7 @@ test('public reads remain available and authentication routes are rate limited',
 
 test('private profile reads require ownership of the requested identifier', async () => {
   const otherUserId = 'c0a80101-0000-4000-8000-000000000002';
-  const app = createTestApp(async (sql) => {
+  const app = createTestApp(async (sql: string) => {
     if (sql.includes('FROM users WHERE id = $1')) {
       return { rows: [{ id: userId, is_banned: false }] };
     }
@@ -133,7 +135,7 @@ test('private profile reads require ownership of the requested identifier', asyn
 
 test('profile updates require ownership even when the caller has a valid token', async () => {
   const otherUserId = 'c0a80101-0000-4000-8000-000000000002';
-  const app = createTestApp(async (sql) => {
+  const app = createTestApp(async (sql: string) => {
     if (sql.includes('FROM users WHERE id = $1')) {
       return { rows: [{ id: userId, is_banned: false }] };
     }
@@ -153,7 +155,7 @@ test('profile updates require ownership even when the caller has a valid token',
 });
 
 test('Firebase session login rejects deleted database accounts without recreating them', async () => {
-  const queries = [];
+  const queries: string[] = [];
   const claims = {
     sub: 'deleted-firebase-user',
     email: 'deleted@example.com',

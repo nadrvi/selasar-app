@@ -1,4 +1,4 @@
-import { query } from '../config/db.js';
+import { query, pool } from '../config/db.ts';
 
 async function runMigration() {
   console.log('[MIGRATION] Starting Community Reviews schema migration...');

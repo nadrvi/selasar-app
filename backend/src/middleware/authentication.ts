@@ -1,6 +1,11 @@
 import process from 'node:process';
-import { verifyAuthToken } from '../utils/authTokens.js';
+import { verifyAuthToken } from '../utils/authTokens.ts';
 import { getConnInfo } from '@hono/node-server/conninfo';
+import type { Context, MiddlewareHandler } from 'hono';
+import type { QueryFunction } from '../config/db.ts';
+import type { AuthenticatedUser } from '../types.ts';
+
+type PoolUser = AuthenticatedUser;
 
 const PRIVATE_READ_PATTERNS = [
   /^\/api\/users\/([^/]+)\/profile$/,
@@ -21,7 +26,7 @@ const RATE_LIMITS = new Map([
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 let rateChecks = 0;
 
-function getRateLimitKey(method, path) {
+function getRateLimitKey(method: string, path: string): string | null {
   if (method === 'GET' && /^\/api\/reviews\/place\/[^/]+$/.test(path)) {
     return 'GET /api/reviews/place';
   }
@@ -29,7 +34,11 @@ function getRateLimitKey(method, path) {
   return RATE_LIMITS.has(key) ? key : null;
 }
 
-async function isRateLimited(c, key, query) {
+async function isRateLimited(
+  c: Context,
+  key: string,
+  query: QueryFunction,
+): Promise<number> {
   const limit = RATE_LIMITS.get(key);
   if (!limit) return 0;
 
@@ -79,7 +88,9 @@ async function isRateLimited(c, key, query) {
     : 0;
 }
 
-export function createAuthenticationMiddleware(query) {
+export function createAuthenticationMiddleware(
+  query: QueryFunction,
+): MiddlewareHandler {
   return async (c, next) => {
     const path = c.req.path;
     const method = c.req.method.toUpperCase();
@@ -142,7 +153,7 @@ export function createAuthenticationMiddleware(query) {
          AND s.expires_at > NOW()`,
       [claims.sub, claims.jti],
     );
-    const user = userRes.rows[0];
+    const user = userRes.rows[0] as PoolUser | undefined;
     if (!user || user.is_banned) {
       console.warn(JSON.stringify({
         event: 'auth.denied',

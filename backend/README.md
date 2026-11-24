@@ -11,19 +11,22 @@ selasar-backend/
 ├── .env                  # Environment variables & credentials
 ├── .env.example          # Template konfigurasi
 ├── package.json          # Dependencies & scripts
+├── tsconfig.json         # Konfigurasi pemeriksaan tipe TypeScript
 └── src/
-    ├── index.js          # Entry point server Hono & routing
+    ├── index.ts          # Entry point server Hono & routing
     ├── config/
-    │   ├── db.js         # Connection pool PostgreSQL (Neon DB)
-    │   └── s3.js         # Client & presigned URL S3 (Neon Storage)
+    │   ├── db.ts         # Connection pool PostgreSQL (Neon DB)
+    │   └── s3.ts         # Client & presigned URL S3 (Neon Storage)
+    ├── middleware/
+    │   └── authentication.ts
     └── routes/
-        ├── places.js     # Endpoint spot nugas (katalog, search, filter, popular)
-        ├── reviews.js    # Endpoint rating & ulasan (sub-rating, helpful, photo)
-        ├── bookmarks.js  # Endpoint simpan / toggle favorit spot
-        ├── checkins.js   # Endpoint realtime check-in & checkout
-        ├── users.js      # Sync akun Firebase ke Postgres & profile stats
-        ├── storage.js    # Direct presigned URL upload ke Neon S3
-        └── promos.js     # Banner promo & event
+        ├── places.ts     # Endpoint spot nugas (katalog, search, filter, popular)
+        ├── reviews.ts    # Endpoint rating & ulasan (sub-rating, helpful, photo)
+        ├── bookmarks.ts  # Endpoint simpan / toggle favorit spot
+        ├── checkins.ts   # Endpoint realtime check-in & checkout
+        ├── users.ts      # Sync akun Firebase ke Postgres & profile stats
+        ├── storage.ts    # Direct presigned URL upload ke Neon S3
+        └── promos.ts     # Banner promo & event
 ```
 
 ---
@@ -89,7 +92,11 @@ untuk menghapus hash password PostgreSQL lama yang tidak lagi dipakai.
    ```
 3. Server akan aktif di `http://localhost:4000`
 
-Server Hono yang sama juga diekspor dari `src/app.js` untuk entry point
+Backend menggunakan TypeScript dengan mode ketat. Jalankan `npm run typecheck`
+untuk memeriksa tipe dan `npm test` untuk menjalankan tes. Runtime dan skrip
+migrasi dijalankan melalui `tsx`.
+
+Server Hono yang sama juga diekspor dari `src/app.ts` untuk entry point
 Cloudflare Worker. Konfigurasi deploy full-stack dan langkah Hyperdrive berada
 di bagian **Deploy to Cloudflare** pada README root.
 

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { query, withTransaction } from '../config/db.js';
-import { resolveUser } from '../utils/userResolver.js';
+import { query, withTransaction } from '../config/db.ts';
+import { resolveUser } from '../utils/userResolver.ts';
+import { logServerError } from '../utils/errors.ts';
 
 export const checkinsRouter = new Hono();
 
@@ -36,7 +37,8 @@ checkinsRouter.get('/user/:identifier', async (c) => {
       active_checkin: result.rows[0] || null,
     });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('checkins.user.error', err);
+    return c.json({ success: false, message: 'Gagal memuat check-in.' }, 500);
   }
 });
 
@@ -66,7 +68,8 @@ checkinsRouter.get('/place/:placeId', async (c) => {
       data: result.rows,
     });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('checkins.place.error', err);
+    return c.json({ success: false, message: 'Gagal memuat pengunjung.' }, 500);
   }
 });
 
@@ -139,8 +142,8 @@ checkinsRouter.post('/in', async (c) => {
       current_visitors: outcome.currentVisitors,
     }, 201);
   } catch (err) {
-    console.error('Error during check-in:', err);
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('checkins.create.error', err);
+    return c.json({ success: false, message: 'Gagal melakukan check-in.' }, 500);
   }
 });
 
@@ -190,6 +193,7 @@ checkinsRouter.post('/out', async (c) => {
       current_visitors: outcome.currentVisitors,
     });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('checkins.end.error', err);
+    return c.json({ success: false, message: 'Gagal melakukan check-out.' }, 500);
   }
 });

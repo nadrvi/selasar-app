@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import {
   getPresignedUploadUrl,
   isS3Configured,
-} from '../config/s3.js';
+} from '../config/s3.ts';
 import { randomUUID } from 'node:crypto';
+import { logServerError } from '../utils/errors.ts';
 
 export const storageRouter = new Hono();
 
@@ -16,14 +17,22 @@ const ALLOWED_CONTENT_TYPES = new Map([
   ['gif', 'image/gif'],
 ]);
 
-export function validateUploadRequest(body) {
+export interface UploadRequest {
+  filename: string;
+  folder: string;
+  extension: string;
+  contentType: string;
+}
+
+export function validateUploadRequest(body: unknown): UploadRequest | null {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
 
-  const filename = typeof body.filename === 'string' ? body.filename.trim() : '';
-  const folder = body.folder ?? 'reviews';
-  const extension = filename.split('.').pop()?.toLowerCase();
+  const request = body as Record<string, unknown>;
+  const filename = typeof request.filename === 'string' ? request.filename.trim() : '';
+  const folder = request.folder ?? 'reviews';
+  const extension = filename.split('.').pop()?.toLowerCase() ?? '';
   const expectedContentType = ALLOWED_CONTENT_TYPES.get(extension);
-  const contentType = body.contentType ?? 'image/jpeg';
+  const contentType = request.contentType ?? 'image/jpeg';
 
   if (
     filename.length === 0 ||
@@ -32,6 +41,7 @@ export function validateUploadRequest(body) {
     !expectedContentType ||
     typeof folder !== 'string' ||
     !ALLOWED_FOLDERS.has(folder) ||
+    typeof contentType !== 'string' ||
     contentType !== expectedContentType
   ) {
     return null;
@@ -77,7 +87,7 @@ storageRouter.post('/presigned-url', async (c) => {
       data: uploadDetails,
     });
   } catch (err) {
-    console.error('Error generating presigned url:', err);
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('storage.presigned_url.error', err);
+    return c.json({ success: false, message: 'Gagal menyiapkan unggahan.' }, 500);
   }
 });

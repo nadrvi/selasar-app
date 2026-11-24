@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { query } from '../config/db.js';
+import { query } from '../config/db.ts';
+import { logServerError } from '../utils/errors.ts';
 
 export const promosRouter = new Hono();
 
@@ -27,6 +28,7 @@ promosRouter.get('/', async (c) => {
       data: result.rows,
     });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('promos.list.error', err);
+    return c.json({ success: false, message: 'Gagal memuat promosi.' }, 500);
   }
 });

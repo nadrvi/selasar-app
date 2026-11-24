@@ -7,6 +7,7 @@ import {
   verify as verifySignature,
 } from 'node:crypto';
 import process from 'node:process';
+import type { JsonWebKey } from 'node:crypto';
 
 const TOKEN_ISSUER = 'selasar-api';
 const TOKEN_AUDIENCE = 'selasar-client';
@@ -35,10 +36,10 @@ if (!configuredSecret) {
 }
 const tokenSecret = configuredSecret || randomBytes(32).toString('base64url');
 
-let firebaseKeys = new Map();
+let firebaseKeys = new Map<string, ReturnType<typeof createPublicKey>>();
 let firebaseKeysExpireAt = 0;
 
-function decodeBase64Url(value) {
+function decodeBase64Url(value: string) {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
   try {
     return Buffer.from(value, 'base64url');
@@ -47,24 +48,93 @@ function decodeBase64Url(value) {
   }
 }
 
-function parseJsonSegment(segment) {
+function parseJsonSegment(segment: string): Record<string, unknown> | null {
   const decoded = decodeBase64Url(segment);
   if (!decoded) return null;
   try {
     const value = JSON.parse(decoded.toString('utf8'));
     return value && typeof value === 'object' && !Array.isArray(value)
-      ? value
+      ? value as Record<string, unknown>
       : null;
   } catch {
     return null;
   }
 }
 
-function signHmac(data) {
+function signHmac(data: string) {
   return createHmac('sha256', tokenSecret).update(data).digest();
 }
 
-export function issueAuthToken(userId) {
+export interface AuthTokenClaims {
+  iss: string;
+  aud: string;
+  sub: string;
+  iat: number;
+  exp: number;
+  jti: string;
+}
+
+export interface FirebaseIdTokenClaims {
+  aud: string;
+  iss: string;
+  sub: string;
+  user_id: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  iat: number;
+  exp: number;
+  auth_time: number;
+  firebase?: { sign_in_provider?: string };
+  [claim: string]: unknown;
+}
+
+function isAuthTokenClaims(
+  claims: Record<string, unknown>,
+): claims is Record<string, unknown> & AuthTokenClaims {
+  return (
+    claims.iss === TOKEN_ISSUER &&
+    claims.aud === TOKEN_AUDIENCE &&
+    typeof claims.sub === 'string' &&
+    /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(claims.sub) &&
+    typeof claims.jti === 'string' &&
+    /^[0-9a-f]{32}$/.test(claims.jti) &&
+    typeof claims.iat === 'number' &&
+    Number.isInteger(claims.iat) &&
+    typeof claims.exp === 'number' &&
+    Number.isInteger(claims.exp)
+  );
+}
+
+function isFirebaseIdTokenClaims(
+  claims: Record<string, unknown>,
+): claims is Record<string, unknown> & FirebaseIdTokenClaims {
+  return (
+    typeof claims.aud === 'string' &&
+    typeof claims.iss === 'string' &&
+    typeof claims.sub === 'string' &&
+    typeof claims.user_id === 'string' &&
+    typeof claims.iat === 'number' &&
+    Number.isInteger(claims.iat) &&
+    typeof claims.exp === 'number' &&
+    Number.isInteger(claims.exp) &&
+    typeof claims.auth_time === 'number' &&
+    Number.isInteger(claims.auth_time) &&
+    (claims.email === undefined || typeof claims.email === 'string') &&
+    (claims.email_verified === undefined || typeof claims.email_verified === 'boolean') &&
+    (claims.name === undefined || typeof claims.name === 'string') &&
+    (claims.picture === undefined || typeof claims.picture === 'string')
+  );
+}
+
+interface FirebaseJwk extends JsonWebKey {
+  kid?: string;
+  kty?: string;
+  use?: string;
+}
+
+export function issueAuthToken(userId: string): string {
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString(
     'base64url',
@@ -84,7 +154,7 @@ export function issueAuthToken(userId) {
   return `${signingInput}.${signature}`;
 }
 
-export function verifyAuthToken(token) {
+export function verifyAuthToken(token: string): AuthTokenClaims | null {
   if (typeof token !== 'string' || token.length > MAX_TOKEN_LENGTH) return null;
 
   const parts = token.split('.');
@@ -113,14 +183,7 @@ export function verifyAuthToken(token) {
 
   const now = Math.floor(Date.now() / 1000);
   if (
-    claims.iss !== TOKEN_ISSUER ||
-    claims.aud !== TOKEN_AUDIENCE ||
-    typeof claims.sub !== 'string' ||
-    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(claims.sub) ||
-    typeof claims.jti !== 'string' ||
-    !/^[0-9a-f]{32}$/.test(claims.jti) ||
-    !Number.isInteger(claims.iat) ||
-    !Number.isInteger(claims.exp) ||
+    !isAuthTokenClaims(claims) ||
     claims.iat > now + 60 ||
     claims.exp <= now ||
     claims.exp - claims.iat > TOKEN_TTL_SECONDS
@@ -131,7 +194,7 @@ export function verifyAuthToken(token) {
   return claims;
 }
 
-async function getFirebaseKeys(forceRefresh = false) {
+async function getFirebaseKeys(forceRefresh = false): Promise<Map<string, ReturnType<typeof createPublicKey>>> {
   if (!forceRefresh && firebaseKeys.size > 0 && Date.now() < firebaseKeysExpireAt) {
     return firebaseKeys;
   }
@@ -151,7 +214,7 @@ async function getFirebaseKeys(forceRefresh = false) {
     throw new Error(`Firebase signing keys returned HTTP ${response.status}`);
   }
 
-  let body;
+  let body: { keys?: FirebaseJwk[] };
   try {
     body = await response.json();
   } catch (error) {
@@ -164,7 +227,7 @@ async function getFirebaseKeys(forceRefresh = false) {
   const nextKeys = new Map(
     body.keys
       .filter((key) => key && key.kid && key.kty === 'RSA' && key.use === 'sig')
-      .map((key) => [key.kid, createPublicKey({ key, format: 'jwk' })]),
+        .map((key) => [key.kid as string, createPublicKey({ key, format: 'jwk' })]),
   );
   if (nextKeys.size === 0) {
     throw new Error('Firebase signing keys response contains no usable keys');
@@ -181,7 +244,7 @@ async function getFirebaseKeys(forceRefresh = false) {
   return firebaseKeys;
 }
 
-export async function verifyFirebaseIdToken(token) {
+export async function verifyFirebaseIdToken(token: string): Promise<FirebaseIdTokenClaims | null> {
   if (
     typeof token !== 'string' ||
     token.length > MAX_TOKEN_LENGTH ||
@@ -222,18 +285,15 @@ export async function verifyFirebaseIdToken(token) {
   const now = Math.floor(Date.now() / 1000);
   const projectId = firebaseProjectId;
   if (
+    !isFirebaseIdTokenClaims(claims) ||
     claims.aud !== projectId ||
     claims.iss !== `https://securetoken.google.com/${projectId}` ||
-    typeof claims.sub !== 'string' ||
     claims.sub.length < 1 ||
     claims.sub.length > 128 ||
     claims.user_id !== claims.sub ||
-    !Number.isInteger(claims.iat) ||
-    !Number.isInteger(claims.exp) ||
     claims.iat > now + 60 ||
     claims.exp <= now ||
     claims.exp - claims.iat > 60 * 60 ||
-    !Number.isInteger(claims.auth_time) ||
     claims.auth_time > now + 60 ||
     claims.auth_time > claims.iat
   ) {

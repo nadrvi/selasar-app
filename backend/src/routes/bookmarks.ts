@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { query, withTransaction } from '../config/db.js';
-import { resolveUser } from '../utils/userResolver.js';
+import { query, withTransaction } from '../config/db.ts';
+import { resolveUser } from '../utils/userResolver.ts';
+import { logServerError } from '../utils/errors.ts';
 
 export const bookmarksRouter = new Hono();
 
@@ -56,8 +57,8 @@ bookmarksRouter.get('/:uid', async (c) => {
       data: result.rows,
     });
   } catch (err) {
-    console.error('[BOOKMARK GET ERROR]:', err.message);
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('bookmarks.get.error', err);
+    return c.json({ success: false, message: 'Gagal memuat bookmark.' }, 500);
   }
 });
 
@@ -140,8 +141,8 @@ bookmarksRouter.post('/toggle', async (c) => {
       total_bookmarks: outcome.totalBookmarks,
     });
   } catch (err) {
-    console.error('[BOOKMARK TOGGLE ERROR]:', err.message);
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('bookmarks.toggle.error', err);
+    return c.json({ success: false, message: 'Gagal memperbarui bookmark.' }, 500);
   }
 });
 
@@ -164,6 +165,7 @@ bookmarksRouter.get('/:uid/check/:placeId', async (c) => {
 
     return c.json({ success: true, bookmarked: res.rows.length > 0 });
   } catch (err) {
-    return c.json({ success: false, bookmarked: false, message: err.message }, 500);
+    logServerError('bookmarks.check.error', err);
+    return c.json({ success: false, bookmarked: false, message: 'Gagal memeriksa bookmark.' }, 500);
   }
 });

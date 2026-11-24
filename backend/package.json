@@ -3,14 +3,20 @@
   "version": "1.0.0",
   "description": "Backend REST API for Selasar App using Hono.js, PostgreSQL (Neon), and S3 Storage",
   "type": "module",
-  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/index.ts",
   "scripts": {
-    "dev": "node --watch --env-file=.env src/index.js",
-    "start": "node src/index.js",
-    "migrate:harden-backend": "node src/migrations/harden_backend.js",
-    "migrate:secure-seed-accounts": "node src/migrations/secure_seed_accounts.js",
-    "migrate:clear-legacy-password-hashes": "node src/migrations/clear_legacy_password_hashes.js",
-    "test": "node --test"
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "start": "tsx --env-file=.env src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "migrate:harden-backend": "tsx --env-file=.env src/migrations/harden_backend.ts",
+    "migrate:secure-seed-accounts": "tsx --env-file=.env src/migrations/secure_seed_accounts.ts",
+    "migrate:clear-legacy-password-hashes": "tsx --env-file=.env src/migrations/clear_legacy_password_hashes.ts",
+    "migrate:community-reviews": "tsx --env-file=.env src/migrations/community_reviews_migration.ts",
+    "seed:hours": "tsx --env-file=.env src/migrations/seed_hours.ts",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
@@ -22,5 +28,11 @@
     "dotenv": "^16.4.7",
     "hono": "^4.7.0",
     "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/pg": "^8.15.4",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
   }
 }

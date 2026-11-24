@@ -8,9 +8,9 @@
   ],
   "scripts": {
     "dev": "vite",
-    "dev:backend": "node --watch --env-file=backend/.env backend/src/index.js",
+    "dev:backend": "npm run dev --workspace=backend",
     "dev:cloudflare": "npm run build && wrangler dev",
-    "start:backend": "node backend/src/index.js",
+    "start:backend": "npm run start --workspace=backend",
     "build": "vite build",
     "deploy": "npm run build && wrangler deploy",
     "lint": "eslint .",

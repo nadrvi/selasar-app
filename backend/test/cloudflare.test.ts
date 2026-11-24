@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import process from 'node:process';
 import test from 'node:test';
 import { Hono } from 'hono';
-import { createAuthenticationMiddleware } from '../src/middleware/authentication.js';
+import { createAuthenticationMiddleware } from '../src/middleware/authentication.ts';
 
 process.env.SELASAR_WORKER_RUNTIME = 'cloudflare';
 
@@ -11,14 +11,14 @@ test('authentication rate limits distinguish Cloudflare client IPs', async () =>
   const rateCounts = new Map();
   app.use('/api/*', createAuthenticationMiddleware(async (sql, params) => {
     if (!sql.includes('INSERT INTO api_rate_limits')) return { rows: [] };
-    const bucket = params[0];
+    const bucket = params?.[0] as string;
     const count = (rateCounts.get(bucket) || 0) + 1;
     rateCounts.set(bucket, count);
     return { rows: [{ request_count: count, retry_after_seconds: 900 }] };
   }));
   app.post('/api/auth/session', (c) => c.json({ success: true }));
 
-  const request = (ip) => app.request('/api/auth/session', {
+  const request = (ip: string) => app.request('/api/auth/session', {
     method: 'POST',
     headers: { 'CF-Connecting-IP': ip },
   });

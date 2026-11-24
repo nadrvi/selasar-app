@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { query } from '../config/db.js';
+import { query } from '../config/db.ts';
+import { logServerError } from '../utils/errors.ts';
 
 export const placesRouter = new Hono();
 
@@ -8,7 +9,7 @@ export const DEFAULT_PLACE_IMAGE = 'https://images.unsplash.com/photo-1554118811
 /**
  * Format database row to be 100% compatible with Selasar React Frontend
  */
-export const formatPlaceForClient = (p) => {
+export const formatPlaceForClient = (p: Record<string, unknown>) => {
   const images = Array.isArray(p.images) ? p.images : [];
   const primaryImg = p.image_url || images.find((img) => img.is_primary)?.url || images[0]?.url || DEFAULT_PLACE_IMAGE;
 
@@ -149,8 +150,8 @@ placesRouter.get('/', async (c) => {
       data: places,
     });
   } catch (err) {
-    console.error('Error fetching places:', err);
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('places.list.error', err);
+    return c.json({ success: false, message: 'Gagal memuat daftar tempat.' }, 500);
   }
 });
 
@@ -160,7 +161,8 @@ placesRouter.get('/popular', async (c) => {
     const result = await query('SELECT * FROM v_popular_places LIMIT 10');
     return c.json({ success: true, data: result.rows });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('places.popular.error', err);
+    return c.json({ success: false, message: 'Gagal memuat tempat populer.' }, 500);
   }
 });
 
@@ -213,6 +215,7 @@ placesRouter.get('/:id', async (c) => {
 
     return c.json({ success: true, data: formatted });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('places.detail.error', err);
+    return c.json({ success: false, message: 'Gagal memuat detail tempat.' }, 500);
   }
 });

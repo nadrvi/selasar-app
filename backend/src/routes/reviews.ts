@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { query, withTransaction } from '../config/db.js';
+import { query, withTransaction } from '../config/db.ts';
+import type { QueryResultRow } from 'pg';
 
 export const reviewsRouter = new Hono();
 
@@ -235,7 +236,7 @@ reviewsRouter.post('/', async (c) => {
       (secret_tip === undefined || secret_tip === null || typeof secret_tip === 'string');
     const reviewBody = typeof rawReviewBody === 'string' ? rawReviewBody.trim() : null;
     const secretTip = typeof secret_tip === 'string' ? secret_tip.trim() : null;
-    const enumValues = {
+    const enumValues: Record<string, readonly string[]> = {
       visit_purpose: ['wfc', 'nugas', 'me_time', 'meeting', 'hangout'],
       noise_level: ['quiet', 'moderate', 'lively'],
       plug_score: ['abundant', 'sufficient', 'limited'],

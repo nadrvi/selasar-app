@@ -7,16 +7,17 @@ import { secureHeaders } from "hono/secure-headers";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
 
-import * as db from "./config/db.js";
-import { createAuthenticationMiddleware } from "./middleware/authentication.js";
-import { authRouter } from "./routes/auth.js";
-import { bookmarksRouter } from "./routes/bookmarks.js";
-import { checkinsRouter } from "./routes/checkins.js";
-import { placesRouter } from "./routes/places.js";
-import { promosRouter } from "./routes/promos.js";
-import { reviewsRouter } from "./routes/reviews.js";
-import { storageRouter } from "./routes/storage.js";
-import { usersRouter } from "./routes/users.js";
+import * as db from "./config/db.ts";
+import { logServerError } from "./utils/errors.ts";
+import { createAuthenticationMiddleware } from "./middleware/authentication.ts";
+import { authRouter } from "./routes/auth.ts";
+import { bookmarksRouter } from "./routes/bookmarks.ts";
+import { checkinsRouter } from "./routes/checkins.ts";
+import { placesRouter } from "./routes/places.ts";
+import { promosRouter } from "./routes/promos.ts";
+import { reviewsRouter } from "./routes/reviews.ts";
+import { storageRouter } from "./routes/storage.ts";
+import { usersRouter } from "./routes/users.ts";
 
 const { query } = db;
 
@@ -181,14 +182,12 @@ app.onError((err, c) => {
     return c.json({ success: false, message: err.message }, err.status);
   }
 
-  console.error("Unhandled server error:", err);
+  logServerError("http.unhandled_error", err);
 
   return c.json(
     {
       success: false,
-      message: isProduction
-        ? GENERIC_ERROR
-        : err.message || "Terjadi kesalahan pada server",
+      message: GENERIC_ERROR,
     },
     500
   );

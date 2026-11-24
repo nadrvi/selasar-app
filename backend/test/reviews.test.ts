@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Hono } from 'hono';
-import { reviewsRouter } from '../src/routes/reviews.js';
+import { reviewsRouter } from '../src/routes/reviews.ts';
 
 function createApp() {
   const app = new Hono();
   app.use('*', async (c, next) => {
-    c.set('authUser', { id: 'c0a80101-0000-4000-8000-000000000001' });
+    c.set('authUser', {
+      id: 'c0a80101-0000-4000-8000-000000000001',
+      firebase_uid: null,
+      username: 'test',
+      role: 'user',
+      is_banned: false,
+    });
     await next();
   });
   app.route('/api/reviews', reviewsRouter);

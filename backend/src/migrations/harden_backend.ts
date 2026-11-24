@@ -1,5 +1,6 @@
 import process from 'node:process';
-import { pool } from '../config/db.js';
+import { pool } from '../config/db.ts';
+import { getErrorCode } from '../utils/errors.ts';
 
 async function hardenBackend() {
   const client = await pool.connect();
@@ -67,12 +68,12 @@ async function hardenBackend() {
     await client.query('ROLLBACK').catch((rollbackError) => {
       console.error(JSON.stringify({
         event: 'migration.harden_backend.rollback_failed',
-        code: rollbackError.code || 'UNKNOWN',
+        code: getErrorCode(rollbackError),
       }));
     });
     console.error(JSON.stringify({
       event: 'migration.harden_backend.failed',
-      code: error.code || 'UNKNOWN',
+      code: getErrorCode(error),
     }));
     process.exitCode = 1;
   } finally {

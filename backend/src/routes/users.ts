@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { query } from '../config/db.js';
-import { resolveUser } from '../utils/userResolver.js';
+import { query } from '../config/db.ts';
+import { resolveUser } from '../utils/userResolver.ts';
+import { getErrorCode, logServerError } from '../utils/errors.ts';
 
 export const usersRouter = new Hono();
 
@@ -58,7 +59,8 @@ usersRouter.get('/:identifier/profile', async (c) => {
       data: result.rows[0],
     });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('users.profile.get.error', err);
+    return c.json({ success: false, message: 'Gagal memuat profil.' }, 500);
   }
 });
 // PUT /api/users/:identifier/profile - Update user profile (name, bio, birthday, avatar)
@@ -90,16 +92,16 @@ usersRouter.put('/:identifier/profile', async (c) => {
     }
 
     const { display_name, bio, birthday, avatar_url } = body;
-    const hasField = (field) => Object.prototype.hasOwnProperty.call(body, field);
-    const isNullableText = (value, maxLength) =>
+    const hasField = (field: string) => Object.prototype.hasOwnProperty.call(body, field);
+    const isNullableText = (value: unknown, maxLength: number) =>
       value === null || (typeof value === 'string' && value.length <= maxLength);
-    const isValidBirthday = (value) => {
+    const isValidBirthday = (value: unknown) => {
       if (value === null || value === '') return true;
       if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
       const date = new Date(`${value}T00:00:00.000Z`);
       return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
     };
-    const isValidAvatar = (value) => {
+    const isValidAvatar = (value: unknown) => {
       if (value === null || value === '') return true;
       if (typeof value !== 'string' || value.length > 2048) return false;
       try {
@@ -159,7 +161,8 @@ usersRouter.put('/:identifier/profile', async (c) => {
       data: res.rows[0],
     });
   } catch (err) {
-    return c.json({ success: false, message: err.message }, 500);
+    logServerError('users.profile.update.error', err);
+    return c.json({ success: false, message: 'Gagal memperbarui profil.' }, 500);
   }
 });
 
@@ -213,7 +216,7 @@ usersRouter.post('/activity', async (c) => {
     console.error(JSON.stringify({
       event: 'activity_log.error',
       requestId: c.get('requestId') || null,
-      code: err.code || 'UNKNOWN',
+      code: getErrorCode(err),
     }));
     return c.json({ success: false, message: 'Gagal mencatat aktivitas.' }, 500);
   }

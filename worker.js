@@ -21,7 +21,7 @@ export default {
 
     process.env.DATABASE_URL = env.HYPERDRIVE.connectionString;
     process.env.SELASAR_WORKER_RUNTIME = "cloudflare";
-    const { default: app } = await import("./backend/src/app.js");
+    const { default: app } = await import("./backend/src/app.ts");
     return app.fetch(request, env, ctx);
   },
 };

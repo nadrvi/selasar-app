@@ -1,12 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
-import { query } from '../config/db.js';
+import { query } from '../config/db.ts';
 import {
   firebaseProjectId,
   issueAuthToken,
   verifyAuthToken,
   verifyFirebaseIdToken,
-} from '../utils/authTokens.js';
+} from '../utils/authTokens.ts';
+import type { Context } from 'hono';
+import type { FirebaseIdTokenClaims } from '../utils/authTokens.ts';
+import { getErrorCode, getErrorConstraint } from '../utils/errors.ts';
 
 export const authRouter = new Hono();
 
@@ -17,7 +20,7 @@ const SOCIAL_SIGN_IN_PROVIDERS = new Set([
   'github.com',
 ]);
 
-function logAuthEvent(c, event, details = {}) {
+function logAuthEvent(c: Context, event: string, details: Record<string, unknown> = {}) {
   console.info(
     JSON.stringify({
       event: `auth.${event}`,
@@ -27,19 +30,19 @@ function logAuthEvent(c, event, details = {}) {
   );
 }
 
-function logAuthError(c, route, error) {
+function logAuthError(c: Context, route: string, error: unknown) {
   console.error(
     JSON.stringify({
       event: 'auth.error',
       requestId: c.get('requestId') || null,
       route,
-      code: error?.code || 'UNKNOWN',
-      constraint: error?.constraint || undefined,
+      code: getErrorCode(error),
+      constraint: getErrorConstraint(error),
     }),
   );
 }
 
-async function readBody(c) {
+async function readBody(c: Context): Promise<Record<string, unknown> | null> {
   try {
     const body = await c.req.json();
     return body && typeof body === 'object' && !Array.isArray(body) ? body : null;
@@ -48,24 +51,24 @@ async function readBody(c) {
   }
 }
 
-function isValidEmail(email) {
+function isValidEmail(email: unknown): email is string {
   return typeof email === 'string' && email.length <= 254 && EMAIL_PATTERN.test(email);
 }
 
-function validDate(value) {
+function validDate(value: unknown): value is string | null | undefined {
   if (value == null || value === '') return true;
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function socialProfileValue(value, maxLength) {
+function socialProfileValue(value: unknown, maxLength: number): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim().slice(0, maxLength)
     : null;
 }
 
-function safeAvatarUrl(value) {
+function safeAvatarUrl(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 2048) return null;
   try {
     const url = new URL(value);
@@ -190,8 +193,8 @@ authRouter.post('/register', async (c) => {
     }, existing ? 200 : 201);
   } catch (error) {
     if (
-      error?.code === '23505' &&
-      ['idx_users_email_lower', 'users_email_key'].includes(error.constraint)
+      getErrorCode(error) === '23505' &&
+      ['idx_users_email_lower', 'users_email_key'].includes(getErrorConstraint(error) || '')
     ) {
       return c.json({
         success: false,
@@ -199,7 +202,7 @@ authRouter.post('/register', async (c) => {
         message: 'Email ini sudah terdaftar. Silakan masuk.',
       }, 409);
     }
-    if (error?.code === '23505' && error.constraint === 'users_firebase_uid_key') {
+    if (getErrorCode(error) === '23505' && getErrorConstraint(error) === 'users_firebase_uid_key') {
       logAuthEvent(c, 'register.failed', { reason: 'identity_conflict' });
       return c.json({
         success: false,
@@ -207,8 +210,8 @@ authRouter.post('/register', async (c) => {
       }, 409);
     }
     if (
-      error?.code === '23505' &&
-      ['idx_users_username_lower', 'users_username_key'].includes(error.constraint)
+      getErrorCode(error) === '23505' &&
+      ['idx_users_username_lower', 'users_username_key'].includes(getErrorConstraint(error) || '')
     ) {
       return c.json({
         success: false,
@@ -229,13 +232,23 @@ authRouter.post('/login', async (c) => {
   }, 410);
 });
 
+interface FirebaseSessionOptions {
+  allowSocialSignup?: boolean;
+  queryFn?: typeof query;
+  verifyIdToken?: (token: string) => Promise<Pick<
+    FirebaseIdTokenClaims,
+    'sub' | 'email' | 'email_verified' | 'name' | 'picture' | 'firebase'
+  > | null>;
+  issueToken?: (userId: string) => string;
+}
+
 export function createFirebaseSessionHandler({
   allowSocialSignup = false,
   queryFn = query,
   verifyIdToken = verifyFirebaseIdToken,
   issueToken = issueAuthToken,
-} = {}) {
-  return async (c) => {
+}: FirebaseSessionOptions = {}) {
+  return async (c: Context) => {
     const body = await readBody(c);
     const idToken = body?.id_token;
     if (typeof idToken !== 'string' || idToken.length > 8192) {
@@ -253,24 +266,22 @@ export function createFirebaseSessionHandler({
       logAuthError(c, '/session/firebase-verification', error);
       return c.json({ success: false, message: 'Verifikasi login sedang tidak tersedia.' }, 503);
     }
-    if (
-      !claims ||
-      claims.email_verified !== true ||
-      !isValidEmail(claims.email)
-    ) {
+    const email = claims?.email;
+    if (!claims || claims.email_verified !== true || !isValidEmail(email)) {
       logAuthEvent(c, 'session.failed', { reason: 'invalid_firebase_token' });
       return c.json({ success: false, message: 'Token Firebase tidak valid.' }, 401);
     }
+    const signInProvider = claims.firebase?.sign_in_provider;
     if (
       allowSocialSignup &&
-      !SOCIAL_SIGN_IN_PROVIDERS.has(claims.firebase?.sign_in_provider)
+      (typeof signInProvider !== 'string' || !SOCIAL_SIGN_IN_PROVIDERS.has(signInProvider))
     ) {
       logAuthEvent(c, 'social_register.failed', { reason: 'invalid_sign_in_provider' });
       return c.json({ success: false, message: 'Pendaftaran sosial tidak valid.' }, 400);
     }
 
     const firebaseUid = claims.sub;
-    const cleanEmail = claims.email.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
     const displayName = socialProfileValue(claims.name, 100);
     const avatarUrl = safeAvatarUrl(claims.picture);
 
@@ -315,7 +326,7 @@ export function createFirebaseSessionHandler({
       }
 
       let user;
-      let status = 200;
+      let status: 200 | 201 = 200;
       if (existing) {
         const updateRes = await queryFn(`
           UPDATE users SET
@@ -377,7 +388,7 @@ export function createFirebaseSessionHandler({
         data: user,
       }, status);
     } catch (error) {
-      if (error?.code === '23505') {
+      if (getErrorCode(error) === '23505') {
         logAuthEvent(c, 'session.failed', { reason: 'identity_conflict' });
         return c.json({ success: false, message: 'Akun tidak dapat ditautkan ke akun ini.' }, 409);
       }

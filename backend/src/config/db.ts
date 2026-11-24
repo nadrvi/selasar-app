@@ -3,7 +3,13 @@ import dotenv from 'dotenv';
 import process from 'node:process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type { PoolClient, QueryResultRow } from 'pg';
+import { getErrorCode, logServerError } from '../utils/errors.ts';
 
+export type QueryFunction = (
+  text: string,
+  params?: unknown[],
+) => Promise<{ rows: QueryResultRow[]; rowCount?: number | null }>;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -38,17 +44,22 @@ export const pool = new Pool({
 pool.on('error', (err) => {
   console.error(JSON.stringify({
     event: 'db.pool.error',
-    code: err.code || 'UNKNOWN',
+    code: getErrorCode(err),
     errorType: err.name || 'Error',
   }));
 });
 
-async function runTransaction(client, callback) {
+async function runTransaction<T>(
+  client: PoolClient | InstanceType<typeof Client>,
+  callback: (query: QueryFunction) => Promise<T>,
+): Promise<T> {
   let transactionStarted = false;
   try {
     await client.query('BEGIN');
     transactionStarted = true;
-    const result = await callback((text, params) => client.query(text, params));
+    const result = await callback((text, params) =>
+      client.query<QueryResultRow, unknown[]>(text, params),
+    );
     await client.query('COMMIT');
     return result;
   } catch (error) {
@@ -56,18 +67,16 @@ async function runTransaction(client, callback) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error(JSON.stringify({
-          event: 'db.transaction.rollback_error',
-          code: rollbackError.code || 'UNKNOWN',
-          errorType: rollbackError.name || 'Error',
-        }));
+        logServerError('db.transaction.rollback_error', rollbackError);
       }
     }
     throw error;
   }
 }
 
-export async function withTransaction(callback) {
+export async function withTransaction<T>(
+  callback: (query: QueryFunction) => Promise<T>,
+): Promise<T> {
   if (process.env.SELASAR_WORKER_RUNTIME === 'cloudflare') {
     const client = new Client({
       connectionString,
@@ -92,7 +101,7 @@ export async function withTransaction(callback) {
 /**
  * Execute an SQL query safely with timing & logging
  */
-export const query = async (text, params) => {
+export const query: QueryFunction = async (text, params) => {
   const start = Date.now();
   try {
     let res;
@@ -103,12 +112,12 @@ export const query = async (text, params) => {
       });
       try {
         await client.connect();
-        res = await client.query(text, params);
+        res = await client.query<QueryResultRow, unknown[]>(text, params);
       } finally {
         await client.end();
       }
     } else {
-      res = await pool.query(text, params);
+      res = await pool.query<QueryResultRow, unknown[]>(text, params);
     }
 
     const duration = Date.now() - start;
@@ -118,11 +127,7 @@ export const query = async (text, params) => {
     }
     return res;
   } catch (error) {
-    console.error(JSON.stringify({
-      event: 'db.query.error',
-      code: error.code || 'UNKNOWN',
-      errorType: error.name || 'Error',
-    }));
+    logServerError('db.query.error', error);
     throw error;
   }
 };

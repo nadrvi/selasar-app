@@ -2,6 +2,7 @@ import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import dotenv from 'dotenv';
 import process from 'node:process';
+import type { Readable } from 'node:stream';
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || '';
 const endpoint = process.env.AWS_ENDPOINT_URL_S3 || '';
 export const BUCKET_NAME = process.env.S3_BUCKET_NAME || '';
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-const isPlaceholderCredential = (value) =>
+const isPlaceholderCredential = (value: string) =>
   !value || /^(?:\*+|YOUR_|CHANGE_ME|REPLACE_ME)/i.test(value);
 
 export const isS3Configured = Boolean(
@@ -36,7 +37,7 @@ export const s3Client = new S3Client({
  * @param {string} contentType - e.g. "image/jpeg", "image/png"
  * @param {number} expiresIn - Expiry in seconds (default 15 minutes)
  */
-export const getPresignedUploadUrl = async (key, contentType, expiresIn = 900) => {
+export const getPresignedUploadUrl = async (key: string, contentType: string, expiresIn = 900) => {
   if (!isS3Configured) {
     throw new Error('S3 Storage belum dikonfigurasi. Harap isi AWS_SECRET_ACCESS_KEY di .env dengan credential Neon S3 kamu.');
   }
@@ -70,7 +71,7 @@ export const getPresignedUploadUrl = async (key, contentType, expiresIn = 900) =
 /**
  * Upload a file directly from server buffer
  */
-export const uploadFileBuffer = async (key, buffer, contentType) => {
+export const uploadFileBuffer = async (key: string, buffer: Buffer | Uint8Array | Readable, contentType: string) => {
   if (!isS3Configured) {
     throw new Error('S3 Storage belum dikonfigurasi.');
   }
@@ -89,7 +90,7 @@ export const uploadFileBuffer = async (key, buffer, contentType) => {
 /**
  * Delete a file in S3 bucket
  */
-export const deleteFile = async (key) => {
+export const deleteFile = async (key: string) => {
   if (!isS3Configured) return;
   const command = new DeleteObjectCommand({
     Bucket: BUCKET_NAME,
