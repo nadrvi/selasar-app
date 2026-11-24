@@ -1,9 +1,124 @@
 import { Hono } from 'hono';
-import { query } from '../config/db.ts';
+import { query, withTransaction } from '../config/db.ts';
 import { resolveUser } from '../utils/userResolver.ts';
 import { getErrorCode, logServerError } from '../utils/errors.ts';
+import { deleteObjectUrls } from '../config/s3.ts';
 
 export const usersRouter = new Hono();
+
+usersRouter.get('/me', async (c) => {
+  const authUser = c.get('authUser');
+  if (!authUser) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+  const result = await query(
+    `SELECT id, firebase_uid, username, email, display_name, avatar_url, bio, birthday,
+            role, is_verified, total_reviews, total_checkins, total_bookmarks,
+            last_login_at, created_at
+     FROM users WHERE id = $1`,
+    [authUser.id],
+  );
+  if (!result.rows[0]) {
+    return c.json({ success: false, message: 'User tidak ditemukan.' }, 404);
+  }
+  return c.json({ success: true, data: result.rows[0] });
+});
+
+usersRouter.patch('/me', async (c) => {
+  const authUser = c.get('authUser');
+  if (!authUser) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return c.json({ success: false, message: 'Body permintaan tidak valid.' }, 400);
+  }
+
+  const allowed = ['display_name', 'bio', 'birthday', 'avatar_url'] as const;
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  for (const field of allowed) {
+    if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+    const value = (body as Record<string, unknown>)[field];
+    if (field === 'display_name' || field === 'bio') {
+      if (
+        value !== null &&
+        (
+          typeof value !== 'string' ||
+          value.length > (field === 'bio' ? 500 : 100)
+        )
+      ) {
+        return c.json({ success: false, message: `Data ${field} tidak valid.` }, 400);
+      }
+      values.push(typeof value === 'string' ? value.trim() : null);
+    } else if (field === 'birthday') {
+      if (value !== null && value !== '' && typeof value !== 'string') {
+        return c.json({ success: false, message: 'Tanggal lahir tidak valid.' }, 400);
+      }
+      values.push(value || null);
+    } else {
+      if (value !== null && value !== '') {
+        if (typeof value !== 'string' || value.length > 2048) {
+          return c.json({ success: false, message: 'URL avatar tidak valid.' }, 400);
+        }
+        try {
+          if (new URL(value).protocol !== 'https:') {
+            return c.json({ success: false, message: 'URL avatar tidak valid.' }, 400);
+          }
+        } catch {
+          return c.json({ success: false, message: 'URL avatar tidak valid.' }, 400);
+        }
+      }
+      values.push(value || null);
+    }
+    fields.push(`${field} = $${values.length}`);
+  }
+
+  if (!fields.length) {
+    return c.json({ success: true, message: 'Tidak ada perubahan', data: authUser });
+  }
+  values.push(authUser.id);
+  const result = await query(`
+    UPDATE users SET ${fields.join(', ')}, updated_at = NOW()
+    WHERE id = $${values.length}
+    RETURNING id, username, email, display_name, avatar_url, bio, birthday, role, updated_at
+  `, values);
+  return c.json({ success: true, message: 'Profil berhasil diperbarui.', data: result.rows[0] });
+});
+
+usersRouter.delete('/me', async (c) => {
+  const authUser = c.get('authUser');
+  if (!authUser) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+  try {
+    const cleanup = await withTransaction(async (tx) => {
+      const avatar = await tx('SELECT avatar_url FROM users WHERE id = $1', [authUser.id]);
+      const reviewImages = await tx(`
+        SELECT ri.url
+        FROM review_images ri
+        JOIN reviews r ON r.id = ri.review_id
+        WHERE r.user_id = $1
+      `, [authUser.id]);
+      await tx('DELETE FROM auth_sessions WHERE user_id = $1', [authUser.id]);
+      await tx('DELETE FROM users WHERE id = $1', [authUser.id]);
+      return {
+        urls: [
+          avatar.rows[0]?.avatar_url,
+          ...reviewImages.rows.map((row) => row.url),
+        ],
+      };
+    });
+    await deleteObjectUrls(cleanup.urls).catch((err) => {
+      logServerError('users.storage_cleanup.error', err);
+    });
+    return c.body(null, 204);
+  } catch (err) {
+    logServerError('users.delete.error', err);
+    return c.json({ success: false, message: 'Gagal menghapus akun.' }, 500);
+  }
+});
 
 // Firebase identities are linked only through /api/auth/session after token verification.
 usersRouter.post('/sync', (c) => c.json({

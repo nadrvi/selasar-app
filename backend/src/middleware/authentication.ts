@@ -9,6 +9,7 @@ type PoolUser = AuthenticatedUser;
 
 const PRIVATE_READ_PATTERNS = [
   /^\/api\/users\/([^/]+)\/profile$/,
+  /^\/api\/users\/me(?:\/profile)?$/,
   /^\/api\/bookmarks\/([^/]+)(?:\/check\/[^/]+)?$/,
   /^\/api\/checkins\/user\/([^/]+)$/,
 ];
@@ -168,6 +169,10 @@ export function createAuthenticationMiddleware(
 
     const privateResourceMatch = privateReadMatch || privateProfileWriteMatch;
     if (privateResourceMatch) {
+      if (path === '/api/users/me' || path === '/api/users/me/profile') {
+        await next();
+        return;
+      }
       let requestedIdentifier;
       try {
         requestedIdentifier = decodeURIComponent(privateResourceMatch[1]);

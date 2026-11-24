@@ -98,3 +98,28 @@ export const deleteFile = async (key: string) => {
   });
   await s3Client.send(command);
 };
+
+export const extractObjectKeyFromUrl = (url: unknown): string | null => {
+  if (typeof url !== 'string' || url.length > 4096) return null;
+  try {
+    const base = new URL(endpoint);
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.origin !== base.origin) return null;
+    const prefix = `/${BUCKET_NAME}/`;
+    if (!parsed.pathname.startsWith(prefix)) return null;
+    const key = decodeURIComponent(parsed.pathname.slice(prefix.length));
+    if (!/^(?:reviews|avatars)\/[A-Za-z0-9._-]+$/.test(key)) return null;
+    return key;
+  } catch {
+    return null;
+  }
+};
+
+export const deleteObjectUrls = async (urls: Iterable<unknown>): Promise<void> => {
+  const keys = new Set<string>();
+  for (const url of urls) {
+    const key = extractObjectKeyFromUrl(url);
+    if (key) keys.add(key);
+  }
+  await Promise.all(Array.from(keys, (key) => deleteFile(key)));
+};

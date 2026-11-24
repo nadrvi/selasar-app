@@ -425,6 +425,25 @@ authRouter.post('/logout', async (c) => {
   }
 });
 
+authRouter.delete('/session', async (c) => {
+  const user = c.get('authUser');
+  const claims = c.get('authClaims');
+  if (!user || !claims) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+  try {
+    await query(
+      `UPDATE auth_sessions SET revoked_at = NOW()
+       WHERE jti = $1 AND user_id = $2 AND revoked_at IS NULL`,
+      [claims.jti, user.id],
+    );
+    return c.json({ success: true, message: 'Sesi berhasil diakhiri.' });
+  } catch (error) {
+    logAuthError(c, '/auth/session', error);
+    return c.json({ success: false, message: 'Gagal mengakhiri sesi.' }, 500);
+  }
+});
+
 authRouter.post('/change-password', async (c) => {
   logAuthEvent(c, 'password_change.rejected', { reason: 'firebase_auth_required' });
   return c.json({

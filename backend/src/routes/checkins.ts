@@ -46,26 +46,20 @@ checkinsRouter.get('/user/:identifier', async (c) => {
 checkinsRouter.get('/place/:placeId', async (c) => {
   try {
     const placeId = c.req.param('placeId');
-
-    const sql = `
-      SELECT 
-        ch.id,
-        ch.checked_in_at,
-        u.username,
-        u.display_name,
-        u.avatar_url
-      FROM checkins ch
-      JOIN users u ON u.id = ch.user_id
-      WHERE ch.place_id = $1 AND ch.status = 'active'
-      ORDER BY ch.checked_in_at DESC
-    `;
-
-    const result = await query(sql, [placeId]);
+    if (!/^\\d+$/.test(placeId) || Number(placeId) < 1) {
+      return c.json({ success: false, message: 'ID tempat tidak valid.' }, 400);
+    }
+    const result = await query(
+      `SELECT COUNT(*)::integer AS active_visitors
+       FROM checkins
+       WHERE place_id = $1 AND status = 'active'`,
+      [placeId],
+    );
 
     return c.json({
       success: true,
-      active_visitors: result.rowCount,
-      data: result.rows,
+      active_visitors: result.rows[0]?.active_visitors || 0,
+      data: [],
     });
   } catch (err) {
     logServerError('checkins.place.error', err);
@@ -195,5 +189,32 @@ checkinsRouter.post('/out', async (c) => {
   } catch (err) {
     logServerError('checkins.end.error', err);
     return c.json({ success: false, message: 'Gagal melakukan check-out.' }, 500);
+  }
+});
+
+checkinsRouter.delete('/current', async (c) => {
+  const user = c.get('authUser');
+  try {
+    const outcome = await withTransaction(async (tx) => {
+      await tx('SELECT id FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+      const result = await tx(`
+        UPDATE checkins
+        SET status = 'ended', checked_out_at = NOW(),
+            duration_min = GREATEST(
+              1,
+              ROUND(EXTRACT(EPOCH FROM (NOW() - checked_in_at)) / 60)::integer
+            )
+        WHERE user_id = $1 AND status = 'active'
+        RETURNING place_id
+      `, [user.id]);
+      return { ended: result.rows.length > 0 };
+    });
+    if (!outcome.ended) {
+      return c.json({ success: false, message: 'Tidak ada check-in aktif.' }, 404);
+    }
+    return c.json({ success: true, message: 'Check-out berhasil.' });
+  } catch (err) {
+    logServerError('checkins.current.delete.error', err);
+    return c.json({ success: false, message: 'Gagal mengakhiri check-in.' }, 500);
   }
 });

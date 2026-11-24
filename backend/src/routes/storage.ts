@@ -5,6 +5,8 @@ import {
 } from '../config/s3.ts';
 import { randomUUID } from 'node:crypto';
 import { logServerError } from '../utils/errors.ts';
+import { BUCKET_NAME, deleteFile } from '../config/s3.ts';
+import { query } from '../config/db.ts';
 
 export const storageRouter = new Hono();
 
@@ -89,5 +91,39 @@ storageRouter.post('/presigned-url', async (c) => {
   } catch (err) {
     logServerError('storage.presigned_url.error', err);
     return c.json({ success: false, message: 'Gagal menyiapkan unggahan.' }, 500);
+  }
+});
+
+storageRouter.delete('/:folder/:filename', async (c) => {
+  const folder = c.req.param('folder');
+  const filename = c.req.param('filename');
+  const user = c.get('authUser');
+  if (!ALLOWED_FOLDERS.has(folder) || !filename || filename.length > 255 || /[\\/]/.test(filename)) {
+    return c.json({ success: false, message: 'Lokasi file tidak valid.' }, 400);
+  }
+  if (!user) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+
+  const key = `${folder}/${filename}`;
+  const suffix = `/${BUCKET_NAME}/${key}`;
+  const ownership = await query(
+    folder === 'avatars'
+      ? `SELECT 1 FROM users
+         WHERE id = $1 AND avatar_url LIKE '%' || $2`
+      : `SELECT 1 FROM review_images ri
+         JOIN reviews r ON r.id = ri.review_id
+         WHERE r.user_id = $1 AND ri.url LIKE '%' || $2`,
+    [user.id, suffix],
+  );
+  if (!ownership.rows.length) {
+    return c.json({ success: false, message: 'File tidak dapat dihapus.' }, 403);
+  }
+  try {
+    await deleteFile(key);
+    return c.body(null, 204);
+  } catch (err) {
+    logServerError('storage.delete.error', err);
+    return c.json({ success: false, message: 'Gagal menghapus file.' }, 500);
   }
 });

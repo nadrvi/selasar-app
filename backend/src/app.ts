@@ -2,13 +2,13 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
 
 import * as db from "./config/db.ts";
 import { logServerError } from "./utils/errors.ts";
+import { openApiDocument } from "./openapi.ts";
 import { createAuthenticationMiddleware } from "./middleware/authentication.ts";
 import { authRouter } from "./routes/auth.ts";
 import { bookmarksRouter } from "./routes/bookmarks.ts";
@@ -31,6 +31,11 @@ const allowedOrigins = (process.env.CLIENT_URL || "")
   .filter(Boolean);
 
 const localhostRegex = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const metrics = new Map<string, number>();
+
+function metric(name: string, increment = 1) {
+  metrics.set(name, (metrics.get(name) || 0) + increment);
+}
 
 if (!process.env.NODE_ENV) {
   console.warn(
@@ -45,11 +50,47 @@ if (isProduction && allowedOrigins.length === 0) {
   );
 }
 
-app.use("*", logger());
 app.use("*", async (c, next) => {
-  c.set("requestId", randomUUID());
-  c.header("X-Request-ID", c.get("requestId"));
-  await next();
+  const startedAt = performance.now();
+  const incomingRequestId = c.req.header("X-Request-ID");
+  const incomingTraceparent = c.req.header("traceparent");
+  if (
+    incomingTraceparent &&
+    /^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/i.test(incomingTraceparent)
+  ) {
+    c.header("traceparent", incomingTraceparent);
+  }
+  const requestId =
+    incomingRequestId &&
+    /^[A-Za-z0-9._:-]{1,128}$/.test(incomingRequestId)
+      ? incomingRequestId
+      : randomUUID();
+  c.set("requestId", requestId);
+  c.header("X-Request-ID", requestId);
+  c.header("Cache-Control", "no-store");
+
+  try {
+    await next();
+  } finally {
+    const durationMs = Math.round((performance.now() - startedAt) * 1000) / 1000;
+    const status = c.res.status;
+    metric("http_requests_total");
+    metric(`http_requests_status_${status}`);
+    metric("http_request_duration_ms_sum", durationMs);
+    console.info(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      event: "http.request_completed",
+      service: "selasar-backend",
+      environment: process.env.NODE_ENV || "development",
+      requestId,
+      method: c.req.method,
+      route: c.req.path,
+      path: c.req.path,
+      status,
+      durationMs,
+    }));
+  }
 });
 
 app.use("*", secureHeaders({ crossOriginResourcePolicy: "cross-origin" }));
@@ -71,8 +112,8 @@ app.use(
       return null;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
-    exposeHeaders: ["Content-Length"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Request-ID", "traceparent"],
+    exposeHeaders: ["Content-Length", "X-Request-ID", "Retry-After", "Location", "traceparent"],
     maxAge: 600,
     credentials: true,
   })
@@ -113,6 +154,45 @@ app.get("/", (c) => {
   });
 });
 
+app.get("/live", (c) => c.json({
+  success: true,
+  status: "live",
+  timestamp: new Date().toISOString(),
+}));
+
+app.get("/ready", async (c) => {
+  const checks: Record<string, "up" | "down" | "disabled"> = {};
+  let ready = true;
+
+  try {
+    await query("SELECT 1");
+    checks.database = "up";
+  } catch {
+    checks.database = "down";
+    ready = false;
+  }
+
+  checks.storage =
+    process.env.S3_BUCKET_NAME &&
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY
+      ? "up"
+      : "disabled";
+
+  return c.json({
+    success: ready,
+    status: ready ? "ready" : "not_ready",
+    checks,
+    timestamp: new Date().toISOString(),
+  }, ready ? 200 : 503);
+});
+
+app.get("/health/metrics", (c) => c.json({
+  success: true,
+  data: Object.fromEntries(metrics),
+  timestamp: new Date().toISOString(),
+}));
+
 app.get("/health/db", async (c) => {
   const res = await query(
     "SELECT NOW() AS server_time, current_database() AS db_name"
@@ -139,6 +219,8 @@ app.get("/api/health", (c) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.get("/api/openapi.json", (c) => c.json(openApiDocument));
 
 app.get("/api/cities", async (c) => {
   const result = await query(

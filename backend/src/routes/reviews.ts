@@ -1,5 +1,8 @@
 import { Hono } from 'hono';
 import { query, withTransaction } from '../config/db.ts';
+import { logServerError } from '../utils/errors.ts';
+import type { Context } from 'hono';
+import { deleteObjectUrls } from '../config/s3.ts';
 import type { QueryResultRow } from 'pg';
 
 export const reviewsRouter = new Hono();
@@ -368,8 +371,16 @@ reviewsRouter.post('/', async (c) => {
         spent_per_person || null,
       ]);
       const review = reviewRes.rows[0];
+      let replacedImageUrls: unknown[] = [];
 
       if (images !== undefined) {
+        const existingImages = await tx(
+          'SELECT url FROM review_images WHERE review_id = $1',
+          [review.id],
+        );
+        replacedImageUrls = existingImages.rows
+          .map((row) => row.url)
+          .filter((url) => typeof url === 'string' && !images.includes(url));
         await tx('DELETE FROM review_images WHERE review_id = $1', [review.id]);
         for (const imageUrl of images) {
           await tx('INSERT INTO review_images (review_id, url) VALUES ($1, $2)', [review.id, imageUrl]);
@@ -382,11 +393,16 @@ reviewsRouter.post('/', async (c) => {
         ON CONFLICT (user_id, badge_id) DO NOTHING
       `, [userId]);
 
-      return { review };
+      return { review, replacedImageUrls };
     });
 
     if (result.placeMissing) {
       return c.json({ success: false, message: 'Tempat tidak ditemukan.' }, 404);
+    }
+    if (result.replacedImageUrls?.length) {
+      await deleteObjectUrls(result.replacedImageUrls).catch((err) => {
+        logServerError('reviews.storage_cleanup.error', err);
+      });
     }
 
     return c.json({ 
@@ -444,5 +460,94 @@ reviewsRouter.post('/:id/helpful', async (c) => {
   } catch (err) {
     console.error('Error toggling review helpful vote:', err);
     return c.json({ success: false, message: 'Gagal memperbarui ulasan.' }, 500);
+  }
+});
+
+async function setHelpful(c: Context, isHelpful: boolean) {
+  const reviewId = c.req.param('id');
+  const user = c.get('authUser');
+  if (!reviewId) {
+    return c.json({ success: false, message: 'ID ulasan tidak valid.' }, 400);
+  }
+  if (!user) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reviewId)) {
+    return c.json({ success: false, message: 'ID ulasan tidak valid.' }, 400);
+  }
+
+  try {
+    const result = await withTransaction(async (tx) => {
+      const review = await tx(
+        "SELECT id FROM reviews WHERE id = $1 AND status = 'active' FOR UPDATE",
+        [reviewId],
+      );
+      if (!review.rows.length) return { reviewMissing: true };
+
+      if (isHelpful) {
+        await tx(
+          'INSERT INTO review_helpful (review_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [reviewId, user.id],
+        );
+      } else {
+        await tx(
+          'DELETE FROM review_helpful WHERE review_id = $1 AND user_id = $2',
+          [reviewId, user.id],
+        );
+      }
+      const count = await tx('SELECT helpful_count FROM reviews WHERE id = $1', [reviewId]);
+      return { helpfulCount: count.rows[0]?.helpful_count || 0 };
+    });
+    if (result.reviewMissing) {
+      return c.json({ success: false, message: 'Ulasan tidak ditemukan.' }, 404);
+    }
+    return c.json({ success: true, isHelpful, helpful_count: result.helpfulCount });
+  } catch (err) {
+    logServerError('reviews.helpful.error', err);
+    return c.json({ success: false, message: 'Gagal memperbarui ulasan.' }, 500);
+  }
+}
+
+reviewsRouter.put('/:id/helpful', (c) => setHelpful(c, true));
+reviewsRouter.delete('/:id/helpful', (c) => setHelpful(c, false));
+
+reviewsRouter.delete('/:id', async (c) => {
+  const reviewId = c.req.param('id');
+  const user = c.get('authUser');
+  if (!reviewId) {
+    return c.json({ success: false, message: 'ID ulasan tidak valid.' }, 400);
+  }
+  if (!user) {
+    return c.json({ success: false, message: 'Autentikasi diperlukan.' }, 401);
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reviewId)) {
+    return c.json({ success: false, message: 'ID ulasan tidak valid.' }, 400);
+  }
+
+  try {
+    const result = await withTransaction(async (tx) => {
+      const review = await tx(
+        'UPDATE reviews SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING id',
+        ['hidden', reviewId, user.id],
+      );
+      if (!review.rows.length) return { deleted: false };
+      const images = await tx('SELECT url FROM review_images WHERE review_id = $1', [reviewId]);
+      await tx('DELETE FROM review_helpful WHERE review_id = $1', [reviewId]);
+      await tx('DELETE FROM review_images WHERE review_id = $1', [reviewId]);
+      return {
+        deleted: true,
+        imageUrls: images.rows.map((row) => row.url),
+      };
+    });
+    if (!result.deleted) {
+      return c.json({ success: false, message: 'Ulasan tidak ditemukan atau tidak dapat dihapus.' }, 404);
+    }
+    await deleteObjectUrls(result.imageUrls ?? []).catch((err) => {
+      logServerError('reviews.storage_delete.error', err);
+    });
+    return c.body(null, 204);
+  } catch (err) {
+    logServerError('reviews.delete.error', err);
+    return c.json({ success: false, message: 'Gagal menghapus ulasan.' }, 500);
   }
 });

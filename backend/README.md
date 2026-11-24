@@ -39,7 +39,7 @@ File `.env` sudah disiapkan di folder `selasar-backend/.env` dengan parameter:
 PORT=4000
 NODE_ENV=development
 
-# Masukkan password database Neon DB kamu pada DATABASE_URL
+# Masuk  kan password database Neon DB kamu pada DATABASE_URL
 DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-selasar.ap-southeast-1.aws.neon.tech/selasar-db?sslmode=require"
 
 # Neon S3 Storage
@@ -107,12 +107,17 @@ di bagian **Deploy to Cloudflare** pada README root.
 ### 1. Health & Status
 - `GET /` — Cek status server API
 - `GET /health/db` — Tes koneksi ke database `selasar-db`
+- `GET /live` — Liveness endpoint
+- `GET /ready` — Readiness database/storage
+- `GET /health/metrics` — Counter request in-process
+- `GET /api/openapi.json` — Dokumen OpenAPI 3.1
 
 ### 2. Authentication
 - `POST /api/auth/register` — Simpan profil setelah Firebase membuat akun
 - `POST /api/auth/register/social` — Daftarkan akun Google/Facebook/GitHub
 - `POST /api/auth/session` — Tukar Firebase ID token terverifikasi dengan token API
 - `POST /api/auth/logout` — Cabut sesi API aktif; logout client tetap menghapus sesi lokal jika server gagal
+- `DELETE /api/auth/session` — Resource canonical untuk mencabut sesi aktif
 - `POST /api/auth/login` — Endpoint lama; login password backend sudah dinonaktifkan
 - `POST /api/auth/change-password` — Endpoint lama; perubahan password dilakukan di Firebase
 
@@ -125,19 +130,28 @@ di bagian **Deploy to Cloudflare** pada README root.
 - `GET /api/reviews/place/:placeId` — Ambil halaman ulasan & ringkasan; mendukung `sort`, `limit` (maks. 100), dan `offset` (maks. 10000)
 - `POST /api/reviews` — Tambah / edit ulasan dengan sub-rating (WiFi, suasana, colokan, harga)
 - `POST /api/reviews/:id/helpful` — Toggle voting "Ulasan ini membantu"
+- `PUT /api/reviews/:id/helpful` — Tandai ulasan membantu
+- `DELETE /api/reviews/:id/helpful` — Hapus voting membantu
+- `DELETE /api/reviews/:id` — Sembunyikan ulasan milik akun
 
 ### 5. Bookmarks (Favorit)
 - `GET /api/bookmarks/:firebaseUid` — Ambil daftar spot yang disimpan oleh user
 - `POST /api/bookmarks/toggle` — Simpan atau hapus spot favorit
+- `PUT /api/bookmarks/:placeId` — Buat atau perbarui bookmark
+- `DELETE /api/bookmarks/:placeId` — Hapus bookmark
 
 ### 6. Check-ins Realtime
 - `GET /api/checkins/place/:placeId` — Daftar pengunjung yang sedang aktif nugas
 - `POST /api/checkins/in` — Check-in ke spot
 - `POST /api/checkins/out` — Check-out dari spot
+- `DELETE /api/checkins/current` — Akhiri satu check-in aktif
 
 ### 7. Users & Gamification
 - `POST /api/users/sync` — Endpoint lama; sinkronisasi akun langsung dinonaktifkan
 - `GET /api/users/:firebaseUid/profile` — Profil lengkap, statistik & badge yang diraih
+- `GET /api/users/me` — Profil akun yang sedang login
+- `PATCH /api/users/me` — Perbarui profil akun yang sedang login
+- `DELETE /api/users/me` — Hapus akun dan session milik akun yang sedang login
 
 ### 8. File Storage (Neon S3)
 - `POST /api/storage/presigned-url` — Request URL upload langsung client-ke-S3 untuk foto ulasan atau avatar

@@ -279,15 +279,13 @@ export async function submitPlaceReview(reviewData) {
 
 export async function toggleReviewHelpfulAPI(reviewId) {
   return await fetchAPI(`/api/reviews/${reviewId}/helpful`, {
-    method: 'POST',
-    body: JSON.stringify({}),
+    method: 'PUT',
   });
 }
 
 export async function logoutAuthSession() {
-  const res = await fetchAPI('/api/auth/logout', {
-    method: 'POST',
-    body: JSON.stringify({}),
+  const res = await fetchAPI('/api/auth/session', {
+    method: 'DELETE',
   });
   if (!res.success) {
     throw new Error(res.message || 'Gagal mengakhiri sesi di server.');
