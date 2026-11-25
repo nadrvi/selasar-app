@@ -483,27 +483,32 @@ export default function Beranda() {
 
       <div className="relative z-10">
         <nav
-          className={`px-6 py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-300 ease-out ${
+          className={`px-4 sm:px-6 py-4 sm:py-6 flex justify-between items-center max-w-7xl mx-auto relative transition-all duration-300 ease-out ${
             isTransitioning
               ? "opacity-0 -translate-y-2 pointer-events-none"
               : "opacity-100 translate-y-0"
           }`}
         >
-          <div className="w-[76px]"></div>
+          <div className="w-11 sm:w-[76px] shrink-0"></div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer transition-transform duration-300 hover:scale-105">
             <img
               src={textLogo}
               alt="Selasar Logo"
               style={{ viewTransitionName: "selasar-logo" }}
-              className="h-16 w-auto object-contain"
+              className="h-14 sm:h-16 w-auto object-contain"
             />
           </div>
-          <Link to="/settings" className="outline-none group">
-            <div className="w-[76px] h-[34px] bg-[#594A42] rounded-full p-1 relative flex items-center justify-end shadow-inner transition-all duration-300 ease-out group-hover:bg-[#433731]">
-              <div className="w-[26px] h-[26px] bg-[#EBE7DF] rounded-full flex items-center justify-center shadow-md text-[#594A42] transition-all duration-300 ease-out group-hover:bg-white group-hover:scale-110">
+          <Link
+            to="/settings"
+            aria-label="Buka pengaturan"
+            title="Pengaturan"
+            className="outline-none group shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-[#8B6B4F] focus-visible:ring-offset-2"
+          >
+            <div className="w-11 h-11 sm:w-[76px] sm:h-[34px] bg-[#594A42] rounded-full p-1 flex items-center justify-center sm:justify-end shadow-md transition-all duration-300 ease-out group-hover:bg-[#433731] group-active:scale-95">
+              <div className="w-8 h-8 sm:w-[26px] sm:h-[26px] bg-[#EBE7DF] rounded-full flex items-center justify-center shadow-md text-[#594A42] transition-all duration-300 ease-out group-hover:bg-white group-hover:scale-105">
                 <FaCog
-                  size={14}
-                  className="animate-[spin_6s_linear_infinite] group-hover:animate-none"
+                  size={16}
+                  className="sm:text-[14px] animate-[spin_12s_linear_infinite] group-hover:animate-none"
                 />
               </div>
             </div>

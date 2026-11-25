@@ -83,11 +83,14 @@ function SettingItem({
   return (
     <button
       onClick={hasToggle ? onToggle : onClick}
-      className={`w-full flex items-center justify-between p-4 ${theme.cardBg} ${theme.itemHover} ${theme.itemActive} transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] group outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B4F] rounded-2xl`}
+      aria-label={title}
+      aria-pressed={hasToggle ? toggleState : undefined}
+      type="button"
+      className={`w-full min-h-[64px] sm:min-h-[68px] flex items-center justify-between px-3 py-3 sm:px-4 sm:py-4 ${theme.cardBg} ${theme.itemHover} ${theme.itemActive} transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.985] group outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B4F] focus-visible:ring-offset-2 rounded-2xl`}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <div
-          className={`relative w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110 group-hover:-rotate-6 group-active:scale-90 group-active:rotate-0 ${
+          className={`relative w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-105 group-hover:-rotate-3 group-active:scale-95 group-active:rotate-0 ${
             isDanger
               ? darkMode
                 ? "bg-red-500/10 text-red-400"
@@ -100,7 +103,7 @@ function SettingItem({
           </span>
         </div>
         <span
-          className={`font-semibold transition-colors duration-300 ${
+          className={`text-[15px] sm:text-base font-semibold text-left leading-5 transition-colors duration-300 ${
             isDanger
               ? darkMode
                 ? "text-red-400"
@@ -240,7 +243,9 @@ function BottomSheet({ isOpen, onClose, title, icon: Icon, children, theme }) {
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-90 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#8B6B4F]"
+              aria-label="Tutup"
+              title="Tutup"
+              className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#8B6B4F] focus-visible:ring-offset-2"
             >
               <FaTimes className={theme.textSecondary} size={14} />
             </button>
@@ -568,13 +573,15 @@ export default function Settings() {
 
       {/* Header */}
       <header
-        className={`sticky top-0 z-50 ${theme.headerBg} backdrop-blur-md px-6 py-6 flex items-center gap-4 shadow-sm transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`sticky top-0 z-50 ${theme.headerBg} backdrop-blur-md px-4 sm:px-6 py-3 sm:py-5 flex items-center gap-3 sm:gap-4 shadow-sm transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isLoaded ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
         }`}
       >
         <button
           onClick={handleBack}
-          className={`group w-10 h-10 ${theme.circleBtnBg} rounded-full flex items-center justify-center ${theme.textPrimary} shadow-sm hover:scale-110 active:scale-90 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] focus-visible:ring-2 focus-visible:ring-[#8B6B4F]`}
+          aria-label="Kembali"
+          title="Kembali"
+          className={`group w-11 h-11 shrink-0 ${theme.circleBtnBg} rounded-full flex items-center justify-center ${theme.textPrimary} shadow-sm hover:scale-105 active:scale-95 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] focus-visible:ring-2 focus-visible:ring-[#8B6B4F] focus-visible:ring-offset-2`}
         >
           <FaArrowLeft
             size={16}
@@ -582,13 +589,13 @@ export default function Settings() {
           />
         </button>
         <h1
-          className={`text-xl font-bold ${theme.textPrimary} transition-colors duration-500`}
+          className={`text-lg sm:text-xl font-bold ${theme.textPrimary} transition-colors duration-500`}
         >
           Pengaturan
         </h1>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 mt-6 flex flex-col gap-6">
+      <main className="max-w-3xl mx-auto px-3 sm:px-6 mt-4 sm:mt-6 flex flex-col gap-4 sm:gap-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {/* Section: Akun */}
         <section
           className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
